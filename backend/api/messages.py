@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from backend.database import get_db
-from backend.schemas import MessageCreate, MessageResponse, MessagesWithBranches
-from backend.models import Message, MessageRole
-from backend.services.thread_service import ThreadService
-from backend.services.provider_factory import ProviderFactory
-from backend.models import ThreadContext
+from ..database import get_db
+from ..schemas import MessageCreate, MessageResponse, MessagesWithBranches
+from ..models import Message, MessageRole, ThreadContext
+from ..services.thread_service import ThreadService
+from ..services.provider_factory import ProviderFactory
 
 router = APIRouter(prefix="/threads", tags=["messages"])
 
@@ -107,7 +106,7 @@ async def send_message(
         model=metadata.get("model"),
         provider=provider.provider_name,
         tokens_used=tokens_used,
-        metadata=metadata
+        response_metadata=metadata
     )
     db.add(assistant_message)
     db.commit()

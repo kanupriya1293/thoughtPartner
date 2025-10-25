@@ -1,7 +1,14 @@
 #!/bin/bash
 
-# Activate virtual environment
-source venv/bin/activate
+# Activate virtual environment (.venv for uv, venv for pip)
+if [ -d ".venv" ]; then
+    source .venv/bin/activate
+elif [ -d "venv" ]; then
+    source venv/bin/activate
+else
+    echo "❌ No virtual environment found. Run ./setup.sh first."
+    exit 1
+fi
 
 # Check if .env exists
 if [ ! -f ".env" ]; then
@@ -9,8 +16,7 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-# Run backend
+# Run backend using Python module syntax (works with relative imports)
 echo "🚀 Starting backend server..."
-cd backend
-uvicorn main:app --reload --port 8000
+python -m uvicorn backend.main:app --reload --port 8000
 

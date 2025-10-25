@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
-from backend.models import Thread, Message, ThreadContext, MessageRole
-from backend.services.summarizer import Summarizer
+from ..models import Thread, Message, ThreadContext, MessageRole
+from .summarizer import Summarizer
 
 
 class ThreadService:
@@ -51,27 +51,25 @@ class ThreadService:
         if parent_thread:
             root_id = parent_thread.root_id
             depth = parent_thread.depth + 1
+            thread_id = None  # Let SQLAlchemy generate
         else:
-            # For root threads, we'll set root_id after creation
-            root_id = None
+            # For root threads, pre-generate ID so root_id can equal id
+            import uuid
+            thread_id = str(uuid.uuid4())
+            root_id = thread_id  # Root thread's root_id is itself
             depth = 0
         
         # Create thread
         thread = Thread(
+            id=thread_id,  # Pre-generated for root, None for child
             parent_thread_id=parent_thread_id,
-            root_id=root_id,  # Will be set to self.id for root threads
+            root_id=root_id,
             depth=depth,
             branch_from_message_id=branch_from_message_id,
             branch_context_text=branch_context_text
         )
         
         self.db.add(thread)
-        self.db.flush()  # Get the ID
-        
-        # Set root_id to self for root threads
-        if root_id is None:
-            thread.root_id = thread.id
-        
         self.db.commit()
         self.db.refresh(thread)
         
@@ -133,7 +131,7 @@ class ThreadService:
                 "model": msg.model,
                 "provider": msg.provider,
                 "tokens_used": msg.tokens_used,
-                "metadata": msg.metadata,
+                "response_metadata": msg.response_metadata,
                 "has_branches": msg.id in message_branches,
                 "branch_count": len(message_branches.get(msg.id, [])),
                 "branches": [

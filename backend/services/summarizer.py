@@ -1,8 +1,8 @@
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
-from backend.models import Thread, Message, ThreadContext
-from backend.services.provider_factory import ProviderFactory
-from backend.config import settings
+from ..models import Thread, Message, ThreadContext
+from .provider_factory import ProviderFactory
+from ..config import settings
 
 
 class Summarizer:

@@ -4,7 +4,7 @@ from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 import enum
 
-from backend.database import Base
+from .database import Base
 
 
 class MessageRole(str, enum.Enum):
@@ -43,7 +43,7 @@ class Message(Base):
     model = Column(String, nullable=True)
     provider = Column(String, nullable=True)
     tokens_used = Column(Integer, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    response_metadata = Column(JSON, nullable=True)
 
     # Relationships
     thread = relationship("Thread", back_populates="messages", foreign_keys=[thread_id])

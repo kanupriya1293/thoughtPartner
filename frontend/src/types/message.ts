@@ -10,7 +10,7 @@ export interface Message {
   model: string | null;
   provider: string | null;
   tokens_used: number | null;
-  metadata: any;
+  response_metadata: any;
   has_branches: boolean;
   branch_count: number;
   branches?: BranchInfo[];

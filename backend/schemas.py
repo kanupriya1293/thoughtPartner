@@ -46,7 +46,7 @@ class MessageResponse(BaseModel):
     model: Optional[str]
     provider: Optional[str]
     tokens_used: Optional[int]
-    metadata: Optional[dict]
+    response_metadata: Optional[dict] = None
     has_branches: bool = False
     branch_count: int = 0
 

@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional, Tuple
 from anthropic import AsyncAnthropic
-from backend.services.llm_provider import LLMProvider
-from backend.config import settings
+from .llm_provider import LLMProvider
+from ..config import settings
 
 
 class AnthropicProvider(LLMProvider):

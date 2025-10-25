@@ -1,7 +1,7 @@
-from backend.services.llm_provider import LLMProvider
-from backend.services.openai_provider import OpenAIProvider
-from backend.services.anthropic_provider import AnthropicProvider
-from backend.config import settings
+from .llm_provider import LLMProvider
+from .openai_provider import OpenAIProvider
+from .anthropic_provider import AnthropicProvider
+from ..config import settings
 
 
 class ProviderFactory:

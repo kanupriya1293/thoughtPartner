@@ -1,7 +1,7 @@
 from typing import List, Dict, Optional, Tuple
 from openai import AsyncOpenAI
-from backend.services.llm_provider import LLMProvider
-from backend.config import settings
+from .llm_provider import LLMProvider
+from ..config import settings
 
 
 class OpenAIProvider(LLMProvider):
@@ -61,8 +61,7 @@ class OpenAIProvider(LLMProvider):
         
         response = await self.client.chat.completions.create(
             model=model_to_use,
-            messages=messages,
-            temperature=0.3
+            messages=messages
         )
         
         summary = response.choices[0].message.content

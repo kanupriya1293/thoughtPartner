@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from backend.database import get_db
-from backend.schemas import ThreadCreate, ThreadResponse
-from backend.services.thread_service import ThreadService
+from ..database import get_db
+from ..schemas import ThreadCreate, ThreadResponse
+from ..services.thread_service import ThreadService
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 

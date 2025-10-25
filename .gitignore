@@ -32,6 +32,12 @@ wheels/
 .env
 .env.local
 
+# Process IDs and logs
+*.pid
+.backend.pid
+.frontend.pid
+logs/
+
 # Node
 node_modules/
 npm-debug.log*

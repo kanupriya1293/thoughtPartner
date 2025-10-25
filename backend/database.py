@@ -23,6 +23,6 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
-    from backend.models import Thread, Message, ThreadContext
+    from .models import Thread, Message, ThreadContext
     Base.metadata.create_all(bind=engine)
 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
-from backend.schemas import ThreadContextResponse, ContextRegenerateRequest
-from backend.models import ThreadContext
-from backend.services.thread_service import ThreadService
-from backend.services.summarizer import Summarizer
+from ..database import get_db
+from ..schemas import ThreadContextResponse, ContextRegenerateRequest
+from ..models import ThreadContext
+from ..services.thread_service import ThreadService
+from ..services.summarizer import Summarizer
 
 router = APIRouter(prefix="/threads", tags=["context"])
 

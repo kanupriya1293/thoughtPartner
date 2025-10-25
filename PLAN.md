@@ -148,42 +148,69 @@ Clear separation of concerns with focused endpoints:
 4. **API Keys**: Environment variables only (`.env` file)
 5. **Max Depth**: No hard limit (optional soft UI warning at deep levels for UX awareness)
 
-## Implementation Phases
+## Implementation Status
 
-### Phase 1: Backend Core
-1. Set up FastAPI project structure
-2. SQLAlchemy models for Thread, Message, ThreadContext
-3. SQLite database initialization
-4. Basic CRUD operations for threads and messages
+### ✅ Phase 1: Backend Core - COMPLETED
+1. ✅ Set up FastAPI project structure
+2. ✅ SQLAlchemy models for Thread, Message, ThreadContext
+3. ✅ SQLite database initialization
+4. ✅ Basic CRUD operations for threads and messages
 
-### Phase 2: LLM Integration
-1. Provider abstraction layer
-2. OpenAI integration
-3. Anthropic integration
-4. Configuration system for API keys (environment variables)
-5. Token usage tracking
+### ✅ Phase 2: LLM Integration - COMPLETED
+1. ✅ Provider abstraction layer
+2. ✅ OpenAI integration
+3. ✅ Anthropic integration
+4. ✅ Configuration system for API keys (environment variables)
+5. ✅ Token usage tracking
 
-### Phase 3: Threading Logic
-1. Thread creation with parent/root relationships
-2. Branch context capture (message_id, selected text)
-3. Summary generation logic
-4. Context assembly for LLM calls (parent summary + thread messages)
-5. Child thread discovery queries
+### ✅ Phase 3: Threading Logic - COMPLETED
+1. ✅ Thread creation with parent/root relationships
+2. ✅ Branch context capture (message_id, selected text)
+3. ✅ Summary generation logic
+4. ✅ Context assembly for LLM calls (parent summary + thread messages)
+5. ✅ Child thread discovery queries
 
-### Phase 4: Frontend MVP
-1. React app setup with TypeScript
-2. Simple chat interface (input box, message display)
-3. Branch creation UI (button/context menu on messages)
-4. Thread navigation (show current thread, list children, go to parent)
-5. Basic thread switcher
-6. Display branch indicators
+### ✅ Phase 4: Frontend MVP - COMPLETED
+1. ✅ React app setup with TypeScript
+2. ✅ Simple chat interface (input box, message display)
+3. ✅ Branch creation UI (button/context menu on messages)
+4. ✅ Thread navigation (show current thread, list children, go to parent)
+5. ✅ Basic thread switcher
+6. ✅ Display branch indicators
 
-### Phase 5: Polish & Testing
-1. Error handling
-2. Loading states
-3. Basic styling
-4. End-to-end testing of branching scenarios
-5. Token usage display
+### ✅ Phase 5: Polish & Testing - COMPLETED
+1. ✅ Error handling
+2. ✅ Loading states
+3. ✅ Basic styling
+4. ✅ End-to-end testing documentation
+5. ✅ Token usage display
+
+## Implemented Features
+
+### Core Functionality
+- ✅ Create root threads automatically
+- ✅ Send messages and receive LLM responses
+- ✅ Create branches from any message
+- ✅ Navigate between parent/child threads
+- ✅ View all children of a thread
+- ✅ "Go to origin" navigation
+- ✅ Branch indicators on messages with counts
+- ✅ Auto-generated thread titles
+- ✅ Parent context summarization
+- ✅ Multi-provider LLM support (OpenAI, Anthropic)
+- ✅ Token usage tracking and display
+- ✅ Persistent storage with SQLite
+- ✅ API documentation (FastAPI Swagger)
+
+### Not Yet Implemented (Future Enhancements)
+- ⏳ Sibling context in conversations
+- ⏳ Text selection for branch context
+- ⏳ Edit/delete messages and threads
+- ⏳ Search across conversations
+- ⏳ Thread visualization (tree/graph view)
+- ⏳ Export conversations
+- ⏳ Multiple root threads UI
+- ⏳ Keyboard shortcuts
 
 ## Files to Create
 
