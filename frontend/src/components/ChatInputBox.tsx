@@ -1,28 +1,42 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 
 interface ChatInputBoxProps {
   onSubmit: (message: string) => void;
   placeholder?: string;
   disabled?: boolean;
   initialValue?: string;
+  onChange?: (value: string) => void;
 }
 
-const ChatInputBox: React.FC<ChatInputBoxProps> = ({ 
+export interface ChatInputBoxRef {
+  focus: () => void;
+  setSelectionRange: (start: number, end: number) => void;
+}
+
+const ChatInputBox = forwardRef<ChatInputBoxRef, ChatInputBoxProps>(({ 
   onSubmit, 
   placeholder = "Type your message here...", 
   disabled = false,
-  initialValue = ""
-}) => {
+  initialValue = "",
+  onChange
+}, ref) => {
   const [message, setMessage] = useState(initialValue);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    },
+    setSelectionRange: (start: number, end: number) => {
+      textareaRef.current?.setSelectionRange(start, end);
+    }
+  }));
+
   // Set initial value when it changes
   useEffect(() => {
-    if (initialValue) {
-      setMessage(initialValue);
-    }
+    setMessage(initialValue);
   }, [initialValue]);
 
   // Auto-resize textarea based on content
@@ -39,6 +53,7 @@ const ChatInputBox: React.FC<ChatInputBoxProps> = ({
     if (message.trim() && !disabled) {
       onSubmit(message);
       setMessage('');
+      onChange?.('');
     }
   };
 
@@ -89,7 +104,10 @@ const ChatInputBox: React.FC<ChatInputBoxProps> = ({
         <textarea
           ref={textareaRef}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            onChange?.(e.target.value);
+          }}
           onKeyPress={handleKeyPress}
           placeholder={placeholder}
           disabled={disabled}
@@ -138,6 +156,8 @@ const ChatInputBox: React.FC<ChatInputBoxProps> = ({
       />
     </form>
   );
-};
+});
+
+ChatInputBox.displayName = 'ChatInputBox';
 
 export default ChatInputBox;

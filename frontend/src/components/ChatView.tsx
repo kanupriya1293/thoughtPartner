@@ -5,7 +5,7 @@ import { Message as MessageType } from '../types/message';
 import { messagesApi, threadsApi } from '../services/api';
 import MessageList from './MessageList';
 import SelectionMenu from './SelectionMenu';
-import ChatInputBox from './ChatInputBox';
+import ChatInputBox, { ChatInputBoxRef } from './ChatInputBox';
 
 interface ChatViewProps {
   onOpenOverlay: (
@@ -34,7 +34,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<ChatInputBoxRef>(null);
   
   // Text selection state
   const [selection, setSelection] = useState<{
@@ -187,8 +187,10 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     // Focus the input
     setTimeout(() => {
       inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(quotedText.length, quotedText.length);
-    }, 0);
+      setTimeout(() => {
+        inputRef.current?.setSelectionRange(quotedText.length, quotedText.length);
+      }, 10);
+    }, 100);
   };
 
   const handleBranchFromSelection = async () => {
@@ -345,9 +347,12 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
 
       <div className="px-8 py-4 bg-white">
         <ChatInputBox 
+          ref={inputRef}
           onSubmit={handleMessageSubmit}
           placeholder="Type your message here..."
           disabled={isLoading}
+          initialValue={inputValue}
+          onChange={setInputValue}
         />
       </div>
     </div>
