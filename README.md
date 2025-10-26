@@ -36,24 +36,27 @@ A custom chatbot interface that enables learning through branching conversations
 - Node.js 18+
 - OpenAI API key
 
-### One-Time Setup
+### First Time Setup (One-Time Only)
 
-1. **Clone and install dependencies:**
+**Step 1: Run the setup script**
 ```bash
 ./setup.sh
 ```
 
-2. **Configure your API key:**
-```bash
-cp env.example .env
-```
+This installs all dependencies:
+- ✅ Creates Python virtual environment
+- ✅ Installs backend dependencies (from `requirements.txt`)
+- ✅ Installs frontend dependencies (`npm install`)
+- ✅ Creates `.env` file from template
+
+**Step 2: Add your API key**
 
 Edit `.env` and add your OpenAI API key:
 ```bash
 OPENAI_API_KEY=your_openai_key_here
 ```
 
-### Running the Application
+### Running the Application (Every Time)
 
 **Start both servers:**
 ```bash
@@ -82,15 +85,34 @@ tail -f logs/frontend.log
 
 ### Manual Setup (Alternative)
 
-If you prefer to run services individually:
+If you prefer manual setup or to run services individually:
 
-**Backend:**
+**1. Backend setup:**
 ```bash
-./run_backend.sh
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-**Frontend:**
+**2. Frontend setup:**
 ```bash
+cd frontend
+npm install
+cd ..
+```
+
+**3. Configure `.env`:**
+```bash
+cp env.example .env
+# Edit .env and add your API key
+```
+
+**4. Run services individually:**
+```bash
+# Backend only
+./run_backend.sh
+
+# Frontend only (in another terminal)
 ./run_frontend.sh
 ```
 
