@@ -57,3 +57,20 @@
 .animate-bounce-delayed {
   animation: bounce-delayed 1.4s ease-in-out infinite;
 }
+
+/* Highlight effect for messages when navigating to them */
+@keyframes highlight {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: #fef08a;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.highlight-message {
+  animation: highlight 2s ease-in-out;
+}

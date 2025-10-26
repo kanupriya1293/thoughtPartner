@@ -1,6 +1,7 @@
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
-from ..models import Thread, Message, ThreadContext, MessageRole
+import uuid
+from ..models import Thread, Message, ThreadContext, MessageRole, ThreadType
 from .summarizer import Summarizer
 
 
@@ -17,7 +18,8 @@ class ThreadService:
         branch_from_message_id: Optional[str] = None,
         branch_context_text: Optional[str] = None,
         branch_text_start_offset: Optional[int] = None,
-        branch_text_end_offset: Optional[int] = None
+        branch_text_end_offset: Optional[int] = None,
+        is_fork: bool = False
     ) -> Thread:
         """
         Create a new thread (root or branch)
@@ -49,33 +51,73 @@ class ThreadService:
             if parent_thread_id and branch_message.thread_id != parent_thread_id:
                 raise ValueError("Branch message must belong to parent thread")
         
-        # Determine root and depth
-        if parent_thread:
-            root_id = parent_thread.root_id
+        # Determine thread type, depth, and ID
+        if is_fork:
+            thread_type = ThreadType.FORK
+            depth = parent_thread.depth + 1
+            thread_id = str(uuid.uuid4())
+        elif parent_thread_id:
+            thread_type = ThreadType.BRANCH
             depth = parent_thread.depth + 1
             thread_id = None  # Let SQLAlchemy generate
         else:
-            # For root threads, pre-generate ID so root_id can equal id
-            import uuid
-            thread_id = str(uuid.uuid4())
-            root_id = thread_id  # Root thread's root_id is itself
+            thread_type = ThreadType.ROOT
             depth = 0
+            thread_id = str(uuid.uuid4())
         
         # Create thread
         thread = Thread(
-            id=thread_id,  # Pre-generated for root, None for child
+            id=thread_id,
             parent_thread_id=parent_thread_id,
-            root_id=root_id,
             depth=depth,
+            thread_type=thread_type,
             branch_from_message_id=branch_from_message_id,
-            branch_context_text=branch_context_text,
-            branch_text_start_offset=branch_text_start_offset,
-            branch_text_end_offset=branch_text_end_offset
+            branch_context_text=branch_context_text if not is_fork else None,
+            branch_text_start_offset=branch_text_start_offset if not is_fork else None,
+            branch_text_end_offset=branch_text_end_offset if not is_fork else None
         )
         
         self.db.add(thread)
         self.db.commit()
         self.db.refresh(thread)
+        
+        # For forks: duplicate messages from parent thread
+        if is_fork and parent_thread_id and branch_from_message_id:
+            fork_message = self.db.query(Message).filter(
+                Message.id == branch_from_message_id
+            ).first()
+            
+            if fork_message:
+                # Get all messages up to and including the fork point
+                messages_to_duplicate = self.db.query(Message).filter(
+                    Message.thread_id == parent_thread_id,
+                    Message.sequence <= fork_message.sequence
+                ).order_by(Message.sequence).all()
+                
+                # Duplicate each message
+                for msg in messages_to_duplicate:
+                    new_message = Message(
+                        id=str(uuid.uuid4()),
+                        thread_id=thread.id,
+                        role=msg.role,
+                        content=msg.content,
+                        sequence=msg.sequence,
+                        timestamp=msg.timestamp,
+                        model=msg.model,
+                        provider=msg.provider,
+                        tokens_used=msg.tokens_used,
+                        response_metadata=msg.response_metadata,
+                        openai_response_id=msg.openai_response_id  # Keep same for OpenAI API
+                    )
+                    self.db.add(new_message)
+                
+                # Set initial fork title (temporary until user sends first message)
+                if parent_thread.title:
+                    thread.title = f"Fork | {parent_thread.title}"
+                else:
+                    thread.title = "Fork | New Thread"
+                
+                self.db.commit()
         
         # Generate parent summary if this is a branch and summarization is enabled
         # OpenAI Responses API doesn't need this (uses previous_response_id)
@@ -118,6 +160,20 @@ class ThreadService:
             query = query.filter(Thread.depth == depth)
         return query.order_by(Thread.created_at.desc()).all()
     
+    def get_threads_by_types(self, types: List[ThreadType]) -> List[Thread]:
+        """
+        Get threads filtered by thread types
+        
+        Args:
+            types: List of thread types to include
+        
+        Returns:
+            List of Thread objects
+        """
+        return self.db.query(Thread).filter(
+            Thread.thread_type.in_(types)
+        ).order_by(Thread.created_at.desc()).all()
+    
     def get_messages_with_branches(self, thread_id: str) -> List[Dict]:
         """
         Get messages for a thread with branch information
@@ -140,9 +196,13 @@ class ThreadService:
                     message_branches[child.branch_from_message_id] = []
                 message_branches[child.branch_from_message_id].append(child)
         
-        # Augment messages with branch info
+        # Augment messages with branch and fork info
         result = []
         for msg in messages:
+            # Separate branches (highlight-based) from forks
+            highlight_branches = [c for c in message_branches.get(msg.id, []) if c.thread_type != ThreadType.FORK]
+            forks = [c for c in message_branches.get(msg.id, []) if c.thread_type == ThreadType.FORK]
+            
             msg_dict = {
                 "id": msg.id,
                 "thread_id": msg.thread_id,
@@ -154,8 +214,8 @@ class ThreadService:
                 "provider": msg.provider,
                 "tokens_used": msg.tokens_used,
                 "response_metadata": msg.response_metadata,
-                "has_branches": msg.id in message_branches,
-                "branch_count": len(message_branches.get(msg.id, [])),
+                "has_branches": len(highlight_branches) > 0,
+                "branch_count": len(highlight_branches),
                 "branches": [
                     {
                         "thread_id": child.id,
@@ -164,44 +224,69 @@ class ThreadService:
                         "branch_text_start_offset": child.branch_text_start_offset,
                         "branch_text_end_offset": child.branch_text_end_offset
                     }
-                    for child in message_branches.get(msg.id, [])
+                    for child in highlight_branches
+                ],
+                "has_forks": len(forks) > 0,
+                "forks": [
+                    {
+                        "thread_id": fork.id,
+                        "title": fork.title
+                    }
+                    for fork in forks
                 ]
             }
             result.append(msg_dict)
         
         return result
     
-    async def generate_thread_title(self, thread_id: str) -> str:
+    async def generate_thread_title(self, thread_id: str, from_last_user_message: bool = False) -> str:
         """
-        Generate title from first user message
+        Generate title from user message
         
         Args:
             thread_id: Thread ID
+            from_last_user_message: If True, use last user message (for forks); otherwise use first
         
         Returns:
             Generated title
         """
-        # Get first user message
-        first_message = self.db.query(Message).filter(
-            Message.thread_id == thread_id,
-            Message.role == MessageRole.USER
-        ).order_by(Message.sequence).first()
+        # Get user message(s)
+        if from_last_user_message:
+            # For forks: use the last user message (the first NEW message in the fork)
+            message = self.db.query(Message).filter(
+                Message.thread_id == thread_id,
+                Message.role == MessageRole.USER
+            ).order_by(Message.sequence.desc()).first()
+        else:
+            # For new threads: use the first user message
+            message = self.db.query(Message).filter(
+                Message.thread_id == thread_id,
+                Message.role == MessageRole.USER
+            ).order_by(Message.sequence).first()
         
-        if not first_message:
+        if not message:
             return "New Thread"
         
-        # Simple title generation: truncate first message
-        content = first_message.content.strip()
+        # Simple title generation: truncate message
+        content = message.content.strip()
         if len(content) <= 50:
             return content
         else:
             return content[:47] + "..."
     
-    async def update_thread_title(self, thread_id: str):
-        """Update thread title if not already set"""
+    async def update_thread_title(self, thread_id: str, force: bool = False, from_last_user_message: bool = False):
+        """
+        Update thread title
+        
+        Args:
+            thread_id: Thread ID
+            force: If True, update title even if it's already set (for forks)
+            from_last_user_message: If True, use last user message for title generation (for forks)
+        """
         thread = self.get_thread(thread_id)
-        if thread and not thread.title:
-            title = await self.generate_thread_title(thread_id)
-            thread.title = title
-            self.db.commit()
+        if thread:
+            if force or not thread.title:
+                title = await self.generate_thread_title(thread_id, from_last_user_message=from_last_user_message)
+                thread.title = title
+                self.db.commit()
 

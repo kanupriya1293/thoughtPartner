@@ -21,6 +21,7 @@ interface ChatViewProps {
     }
   ) => void;
   onCloseOverlay: () => void;
+  onNavigateToThread?: (threadId: string, messageId?: string) => void;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) => {
@@ -28,6 +29,8 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
   const navigate = useNavigate();
   const location = useLocation();
   const [thread, setThread] = useState<Thread | null>(null);
+  const [parentThread, setParentThread] = useState<Thread | null>(null);
+  const [parentMessages, setParentMessages] = useState<MessageType[]>([]);
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +57,25 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       const data = await messagesApi.getMessages(threadId);
       setThread(data.thread_info);
       setMessages(data.messages);
+      
+      // If this is a fork, fetch parent thread info for the "Forked from" indicator
+      if (data.thread_info.parent_thread_id) {
+        try {
+          const parentData = await messagesApi.getMessages(data.thread_info.parent_thread_id);
+          setParentThread(parentData.thread_info);
+          // Only update parentMessages if it's empty (to preserve real-time fork creation)
+          setParentMessages(prev => prev.length > 0 ? prev : parentData.messages);
+        } catch {
+          // Parent thread may not exist or be accessible
+          setParentThread(null);
+          // Only clear parentMessages if we don't have any
+          setParentMessages(prev => prev.length > 0 ? prev : []);
+        }
+      } else {
+        setParentThread(null);
+        // Only clear parentMessages if we don't have any
+        setParentMessages(prev => prev.length > 0 ? prev : []);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load thread');
       console.error('Error loading thread:', err);
@@ -83,6 +105,57 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       }, 100);
     }
   }, [threadId, location, loadThread]);
+
+  // Handle scrolling to a specific message or fork indicator (for fork navigation)
+  useEffect(() => {
+    if (messages.length > 0) {
+      const messageIdToScroll = sessionStorage.getItem('scrollToMessage');
+      if (messageIdToScroll) {
+        sessionStorage.removeItem('scrollToMessage');
+        
+        // Use requestAnimationFrame to wait for DOM to be ready
+        let attempts = 0;
+        const maxAttempts = 20; // Try for up to ~1 second at 60fps
+        
+        const tryScroll = () => {
+          attempts++;
+          
+          // Try to find the fork indicator first (it's what we want to highlight)
+          const forkIndicator = document.querySelector(`[data-fork-indicator="${messageIdToScroll}"]`);
+          
+          if (forkIndicator) {
+            forkIndicator.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            forkIndicator.classList.add('highlight-message');
+            setTimeout(() => {
+              forkIndicator.classList.remove('highlight-message');
+            }, 2000);
+            return;
+          }
+          
+          // Fallback: try to find the message element itself
+          const messageElement = document.querySelector(`[data-message-id="${messageIdToScroll}"]`);
+          if (messageElement) {
+            messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            messageElement.classList.add('highlight-message');
+            setTimeout(() => {
+              messageElement.classList.remove('highlight-message');
+            }, 2000);
+            return;
+          }
+          
+          // If neither found and we haven't exceeded max attempts, try again on next frame
+          if (attempts < maxAttempts) {
+            requestAnimationFrame(tryScroll);
+          }
+        };
+        
+        // Start trying after giving React a chance to render
+        requestAnimationFrame(() => {
+          requestAnimationFrame(tryScroll);
+        });
+      }
+    }
+  }, [messages]);
 
   // Listen for branch created event to reload thread
   useEffect(() => {
@@ -242,6 +315,39 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     }
   };
 
+  const handleForkThread = async (messageId: string) => {
+    if (!threadId) return;
+    
+    try {
+      // Create new forked thread
+      const newThread = await threadsApi.createThread({
+        parent_thread_id: threadId,
+        branch_from_message_id: messageId,
+        is_fork: true
+      });
+      
+      // IMPORTANT: Set parent messages to current thread's messages
+      // This allows the fork indicator to show immediately in the new fork
+      setParentMessages(messages); // Current messages become parent messages
+      
+      // Navigate to the new forked thread
+      navigate(`/chat/${newThread.id}`);
+      // Reload threads list so new fork appears in sidebar
+      window.dispatchEvent(new Event('threadsUpdated'));
+    } catch (error) {
+      console.error('Error forking thread:', error);
+      alert('Failed to fork thread');
+    }
+  };
+
+  const handleNavigateToFork = (targetThreadId: string, messageId: string) => {
+    // Store the message ID to scroll to in session storage
+    sessionStorage.setItem('scrollToMessage', messageId);
+    
+    // Navigate to the target thread
+    navigate(`/chat/${targetThreadId}`);
+  };
+
   if (!threadId) {
     return (
       <div className="chat-view">
@@ -303,8 +409,16 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     setTimeout(() => scrollToBottom(true), 50);
 
     try {
+      // Send message with background processing
       await messagesApi.sendMessage(threadId, { content: messageContent }, true);
+      
+      // Reload thread to get the actual messages (including assistant response)
       await loadThread();
+      
+      // Notify parent to refresh currentThread for sidebar
+      if (threadId) {
+        window.dispatchEvent(new CustomEvent('threadUpdated', { detail: { threadId } }));
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
       console.error('Error sending message:', err);
@@ -327,10 +441,15 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-8 py-6 bg-white">
         <MessageList
           messages={messages}
+          thread={thread}
+          parentThread={parentThread}
+          parentMessages={parentMessages}
           onBranchClick={handleBranchClick}
           onCreateBranch={handleCreateBranch}
           onTextSelection={handleTextSelection}
           onDeleteBranch={handleDeleteBranch}
+          onForkThread={handleForkThread}
+          onNavigateToFork={handleNavigateToFork}
         />
         <div ref={messagesEndRef} />
       </div>

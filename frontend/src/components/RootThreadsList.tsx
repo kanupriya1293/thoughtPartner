@@ -28,6 +28,17 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentRootId, curren
 
   useEffect(() => {
     loadRootThreads();
+    
+    // Listen for thread updates (e.g., when a fork is created)
+    const handleThreadsUpdate = () => {
+      loadRootThreads();
+    };
+    
+    window.addEventListener('threadsUpdated', handleThreadsUpdate);
+    
+    return () => {
+      window.removeEventListener('threadsUpdated', handleThreadsUpdate);
+    };
   }, []);
 
   // Reload threads when currentThreadId changes to a thread that doesn't exist in the list
@@ -50,7 +61,8 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentRootId, curren
 
   // Update the specific thread in the list when its title changes
   useEffect(() => {
-    if (currentThread && currentThread.title && currentThread.depth === 0) {
+    if (currentThread && currentThread.title && 
+        (currentThread.thread_type === 'root' || currentThread.thread_type === 'fork')) {
       setRootThreads(prevThreads => {
         const existingIndex = prevThreads.findIndex(t => t.id === currentThread.id);
         if (existingIndex >= 0) {
@@ -72,7 +84,9 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentRootId, curren
   const loadRootThreads = async () => {
     setIsLoading(true);
     try {
-      const threads = await threadsApi.getRootThreads();
+      // Get root and forked threads (exclude branches)
+      const response = await fetch('http://localhost:8000/threads?types=root,fork');
+      const threads = await response.json();
       setRootThreads(threads);
     } catch (error) {
       console.error('Error loading root threads:', error);

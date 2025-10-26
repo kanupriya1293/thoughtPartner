@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import HomeScreen from './components/HomeScreen';
 import ChatView from './components/ChatView';
@@ -115,6 +115,36 @@ function AppLayout() {
     : undefined;
   const [overlayStack, setOverlayStack] = useState<OverlayThread[]>([]);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [currentThread, setCurrentThread] = useState<any>(null);
+  
+  // Fetch current thread when threadId changes
+  useEffect(() => {
+    if (threadId) {
+      import('./services/api').then(({ threadsApi }) => {
+        threadsApi.getThread(threadId).then(setCurrentThread).catch(() => setCurrentThread(null));
+      });
+    } else {
+      setCurrentThread(null);
+    }
+  }, [threadId]);
+  
+  // Listen for thread updates to refresh sidebar
+  useEffect(() => {
+    const handleThreadUpdate = (event: any) => {
+      const updatedThreadId = event.detail.threadId;
+      if (updatedThreadId === threadId) {
+        import('./services/api').then(({ threadsApi }) => {
+          threadsApi.getThread(updatedThreadId).then(setCurrentThread).catch(() => setCurrentThread(null));
+        });
+      }
+    };
+    
+    window.addEventListener('threadUpdated', handleThreadUpdate);
+    
+    return () => {
+      window.removeEventListener('threadUpdated', handleThreadUpdate);
+    };
+  }, [threadId]);
 
 
   const handleOpenOverlay = (
@@ -175,7 +205,7 @@ function AppLayout() {
         <RootThreadsList 
           currentThreadId={threadId || ''}
           currentRootId={threadId || ''}
-          currentThread={null}
+          currentThread={currentThread}
         />
       </div>
       

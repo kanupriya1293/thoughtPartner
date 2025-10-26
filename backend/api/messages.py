@@ -4,7 +4,7 @@ from typing import List
 
 from ..database import get_db
 from ..schemas import MessageCreate, MessageResponse, MessagesWithBranches
-from ..models import Message, MessageRole, ThreadContext
+from ..models import Message, MessageRole, ThreadContext, Thread, ThreadType
 from ..services.thread_service import ThreadService
 from ..services.provider_factory import ProviderFactory
 
@@ -54,6 +54,11 @@ async def send_message(
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     
+    # Get thread model for checking is_fork
+    thread_model = db.query(Thread).filter(Thread.id == thread_id).first()
+    if not thread_model:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
     # Get next sequence number
     last_message = db.query(Message).filter(
         Message.thread_id == thread_id
@@ -72,8 +77,13 @@ async def send_message(
     db.commit()
     db.refresh(user_message)
     
-    # Update thread title if this is the first user message
-    if next_sequence == 1:
+    # Update thread title logic
+    if thread_model.thread_type == ThreadType.FORK and thread.title and thread.title.startswith("Fork | "):
+        # For forks: regenerate title from the NEW message (not duplicated messages)
+        # Use from_last_user_message=True to get the last user message (the new one)
+        await service.update_thread_title(thread_id, force=True, from_last_user_message=True)
+    elif next_sequence == 1:
+        # For regular threads: update title on first message
         await service.update_thread_title(thread_id)
     
     # Assemble context for LLM

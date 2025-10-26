@@ -113,7 +113,7 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
   };
 
   return (
-    <div className="relative inline-block w-full">
+    <>
       <span>
         {segments.map((segment, idx) => (
           segment.branches.length > 0 ? (
@@ -145,7 +145,7 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
         anchor="center"
         closeOnBackdrop={false}
       />
-    </div>
+    </>
   );
 };
 

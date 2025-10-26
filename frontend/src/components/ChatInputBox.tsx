@@ -6,6 +6,7 @@ interface ChatInputBoxProps {
   disabled?: boolean;
   initialValue?: string;
   onChange?: (value: string) => void;
+  onInitialValueSet?: (length: number) => void;
 }
 
 export interface ChatInputBoxRef {
@@ -18,12 +19,14 @@ const ChatInputBox = forwardRef<ChatInputBoxRef, ChatInputBoxProps>(({
   placeholder = "Type your message here...", 
   disabled = false,
   initialValue = "",
-  onChange
+  onChange,
+  onInitialValueSet
 }, ref) => {
   const [message, setMessage] = useState(initialValue);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialValueSetRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     focus: () => {
@@ -37,7 +40,20 @@ const ChatInputBox = forwardRef<ChatInputBoxRef, ChatInputBoxProps>(({
   // Set initial value when it changes
   useEffect(() => {
     setMessage(initialValue);
+    initialValueSetRef.current = false;
   }, [initialValue]);
+
+  // Call onInitialValueSet after the value is set and rendered
+  useEffect(() => {
+    if (initialValue && !initialValueSetRef.current && onInitialValueSet && message === initialValue) {
+      // Wait for next tick to ensure DOM is updated
+      const timer = setTimeout(() => {
+        onInitialValueSet(message.length);
+        initialValueSetRef.current = true;
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [message, initialValue, onInitialValueSet]);
 
   // Auto-resize textarea based on content
   useEffect(() => {

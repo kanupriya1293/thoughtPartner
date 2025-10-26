@@ -9,9 +9,13 @@ interface MessageProps {
   onCreateBranch: (messageId: string, contextText?: string) => void;
   onTextSelection?: (messageId: string, selectedText: string, startOffset: number, endOffset: number, position: { x: number; y: number }) => void;
   onDeleteBranch?: (threadId: string) => void;
+  onForkThread?: (messageId: string) => void;
+  allowFork?: boolean; // Whether forking is allowed from this message
 }
 
-const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranch, onTextSelection, onDeleteBranch }) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Note: onCreateBranch is passed but not used here (we use onForkThread instead for the Fork button)
+const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranch, onTextSelection, onDeleteBranch, onForkThread, allowFork = true }) => {
   const isUser = message.role === 'user';
   const isLoading = message.isLoading;
   const contentRef = useRef<HTMLDivElement>(null);
@@ -78,7 +82,7 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
   };
   
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`} data-message-id={message.id}>
       <div className={`max-w-[80%] ${isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'}`}>
         {/* Message Bubble */}
         <div
@@ -117,13 +121,13 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
         {(!isUser && (message.has_branches || true) && !isLoading) && (
           <div className={`flex items-center gap-2 mt-1 ${isUser ? 'flex-row-reverse' : ''}`}>
             {/* Actions */}
-            {!isUser && (
+            {!isUser && allowFork && (
               <button 
                 className="text-xs text-gray-600 hover:text-blue-600 px-2 py-1 rounded transition-colors"
-                onClick={() => onCreateBranch(message.id)}
-                title="Create a new branch from this response"
+                onClick={() => onForkThread?.(message.id)}
+                title="Fork this thread from this message"
               >
-                Branch
+                Fork
               </button>
             )}
             {message.has_branches && (

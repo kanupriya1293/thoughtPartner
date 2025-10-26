@@ -10,21 +10,28 @@ class MessageRole(str, Enum):
     SYSTEM = "system"
 
 
+class ThreadType(str, Enum):
+    ROOT = "root"
+    FORK = "fork"
+    BRANCH = "branch"
+
+
 class ThreadCreate(BaseModel):
     parent_thread_id: Optional[str] = None
     branch_from_message_id: Optional[str] = None
     branch_context_text: Optional[str] = None
     branch_text_start_offset: Optional[int] = None
     branch_text_end_offset: Optional[int] = None
+    is_fork: Optional[bool] = False  # Backward compatibility, will be converted to thread_type
 
 
 class ThreadResponse(BaseModel):
     id: str
     parent_thread_id: Optional[str]
-    root_id: str
     depth: int
     created_at: datetime
     title: Optional[str]
+    thread_type: ThreadType
     branch_from_message_id: Optional[str]
     branch_context_text: Optional[str]
     branch_text_start_offset: Optional[int] = None
@@ -54,6 +61,8 @@ class MessageResponse(BaseModel):
     response_metadata: Optional[dict] = None
     has_branches: bool = False
     branch_count: int = 0
+    has_forks: bool = False
+    forks: Optional[list] = None
 
     class Config:
         from_attributes = True

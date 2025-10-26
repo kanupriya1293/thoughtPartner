@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from ..database import get_db
-from ..schemas import ThreadCreate, ThreadResponse
+from ..schemas import ThreadCreate, ThreadResponse, ThreadType
 from ..services.thread_service import ThreadService
 
 router = APIRouter(prefix="/threads", tags=["threads"])
@@ -12,11 +12,21 @@ router = APIRouter(prefix="/threads", tags=["threads"])
 @router.get("", response_model=List[ThreadResponse])
 async def get_threads(
     depth: Optional[int] = Query(None, description="Filter threads by depth (e.g., 0 for root threads)"),
+    types: Optional[str] = Query(None, description="Comma-separated list of thread types (root,fork,branch)"),
     db: Session = Depends(get_db)
 ):
-    """Get all threads, optionally filtered by depth"""
+    """Get all threads, optionally filtered by depth or type"""
     service = ThreadService(db)
-    threads = service.get_threads_by_depth(depth)
+    
+    if types:
+        # Parse comma-separated types
+        type_list = [ThreadType(t.strip()) for t in types.split(',')]
+        threads = service.get_threads_by_types(type_list)
+    elif depth is not None:
+        threads = service.get_threads_by_depth(depth)
+    else:
+        threads = service.get_threads_by_depth(None)
+    
     return threads
 
 
@@ -34,7 +44,8 @@ async def create_thread(
             branch_from_message_id=thread_data.branch_from_message_id,
             branch_context_text=thread_data.branch_context_text,
             branch_text_start_offset=thread_data.branch_text_start_offset,
-            branch_text_end_offset=thread_data.branch_text_end_offset
+            branch_text_end_offset=thread_data.branch_text_end_offset,
+            is_fork=thread_data.is_fork if thread_data.is_fork is not None else False
         )
         return thread
     except ValueError as e:

@@ -14,7 +14,14 @@ export interface Message {
   has_branches: boolean;
   branch_count: number;
   branches?: BranchInfo[];
+  has_forks?: boolean;
+  forks?: ForkInfo[];
   isLoading?: boolean; // Flag to indicate if this is a loading/pending message
+}
+
+export interface ForkInfo {
+  thread_id: string;
+  title: string | null;
 }
 
 export interface BranchInfo {

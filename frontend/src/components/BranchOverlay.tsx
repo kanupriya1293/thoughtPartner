@@ -12,7 +12,7 @@ interface BranchOverlayProps {
   onClose: () => void;
   onBack: () => void;
   canGoBack: boolean;
-  initialText?: string;
+  initialText?: string; // Legacy prop, kept for compatibility
   onNavigateToBranch?: (threadId: string, title: string) => void;
   onDeleteEmptyThread?: (threadId: string) => void;
   onThreadCreated?: (threadId: string, title: string) => void;
@@ -30,7 +30,7 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   onClose,
   onBack,
   canGoBack,
-  initialText,
+  initialText: _initialText, // Destructured but not used, kept for compatibility
   onNavigateToBranch,
   onDeleteEmptyThread,
   onThreadCreated,
@@ -41,7 +41,7 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<React.ElementRef<typeof ChatInputBox>>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   
   // Text selection state
@@ -57,15 +57,33 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     if (threadId) {
       loadThread();
     }
-    
-    // Focus input when overlay opens
-    setTimeout(() => {
-      inputRef.current?.focus();
-      if (initialText) {
-        inputRef.current?.setSelectionRange(initialText.length, initialText.length);
-      }
-    }, 100);
-  }, [threadId, initialText]);
+  }, [threadId]);
+
+  // Handle initial value being set in the textarea
+  const handleInitialValueSet = (_length: number) => {
+    if (inputRef.current && pendingBranch?.contextText) {
+      // Focus the input
+      inputRef.current.focus();
+      
+      // Position cursor after the formatted text (which includes quotes and newlines)
+      const formattedText = `"${pendingBranch.contextText}"\n\n`;
+      inputRef.current.setSelectionRange(formattedText.length, formattedText.length);
+    } else if (inputRef.current) {
+      // No context text, just focus
+      inputRef.current.focus();
+    }
+  };
+
+  // Focus when overlay opens
+  useEffect(() => {
+    // If no initial text, just focus the input
+    if (!pendingBranch?.contextText) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingBranch]);
 
   useEffect(() => {
     scrollToBottom();
@@ -316,6 +334,9 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
         <div className="flex-1 overflow-y-auto px-6 py-6 bg-white">
           <MessageList
             messages={messages}
+            thread={thread}
+            parentThread={null}
+            parentMessages={[]}
             onBranchClick={handleBranchClick}
             onCreateBranch={handleCreateBranch}
             onTextSelection={handleTextSelection}
@@ -336,10 +357,12 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
         {/* Footer with ChatInputBox */}
         <div className="px-6 py-4 bg-white">
           <ChatInputBox
+            ref={inputRef}
             onSubmit={handleMessageSubmit}
             placeholder="Type your message here..."
             disabled={isLoading}
             initialValue={pendingBranch?.contextText ? `"${pendingBranch.contextText}"\n\n` : ''}
+            onInitialValueSet={handleInitialValueSet}
           />
         </div>
     </div>

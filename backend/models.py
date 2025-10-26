@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, JSON, Enum
+from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, JSON, Enum, Boolean
 from sqlalchemy.orm import relationship
 import enum
 
@@ -13,15 +13,21 @@ class MessageRole(str, enum.Enum):
     SYSTEM = "system"
 
 
+class ThreadType(str, enum.Enum):
+    ROOT = "root"
+    FORK = "fork"
+    BRANCH = "branch"
+
+
 class Thread(Base):
     __tablename__ = "threads"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     parent_thread_id = Column(String, ForeignKey("threads.id"), nullable=True)
-    root_id = Column(String, ForeignKey("threads.id"), nullable=False)
     depth = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     title = Column(String, nullable=True)
+    thread_type = Column(Enum(ThreadType), nullable=False, default=ThreadType.ROOT)
     branch_from_message_id = Column(String, ForeignKey("messages.id"), nullable=True)
     branch_context_text = Column(Text, nullable=True)
     branch_text_start_offset = Column(Integer, nullable=True)
