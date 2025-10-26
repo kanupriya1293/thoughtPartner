@@ -7,8 +7,8 @@ A custom chatbot interface that enables learning through branching conversations
 - 🌳 **Branching Conversations**: Create child threads from any message to explore tangential topics
 - 🔄 **Easy Navigation**: Switch between parent, child, and sibling threads seamlessly
 - 🏠 **Root Thread Tracking**: Always know where your conversation started
-- 🤖 **Multi-Provider Support**: Works with OpenAI and Anthropic (Claude) models
-- 📝 **Context Summaries**: Parent thread context automatically summarized for child threads
+- 🤖 **OpenAI Responses API**: Native branching support with stateful conversations
+- 🚀 **Efficient Context**: Uses `previous_response_id` for token-efficient context management
 - 💾 **Persistent Storage**: SQLite database stores all threads and messages
 
 ## Architecture
@@ -29,60 +29,70 @@ A custom chatbot interface that enables learning through branching conversations
 - **Messages**: Linear conversation within each thread
 - **ThreadContext**: Summaries for context passing between threads
 
-## Setup
+## Quick Start
 
 ### Prerequisites
 - Python 3.8+
 - Node.js 18+
-- API keys for OpenAI and/or Anthropic
+- OpenAI API key
 
-### Backend Setup
+### One-Time Setup
 
-1. Create and activate virtual environment:
+1. **Clone and install dependencies:**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+./setup.sh
 ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Configure environment variables:
+2. **Configure your API key:**
 ```bash
 cp env.example .env
 ```
 
-Edit `.env` and add your API keys:
-```
-OPENAI_API_KEY=your_key_here
-ANTHROPIC_API_KEY=your_key_here
-```
-
-4. Run the backend:
+Edit `.env` and add your OpenAI API key:
 ```bash
-cd backend
-uvicorn main:app --reload --port 8000
+OPENAI_API_KEY=your_openai_key_here
 ```
 
-The API will be available at `http://localhost:8000`
-API documentation at `http://localhost:8000/docs`
+### Running the Application
 
-### Frontend Setup
-
-1. Install dependencies:
+**Start both servers:**
 ```bash
-cd frontend
-npm install
+./start.sh
 ```
 
-2. Run the development server:
+This will:
+- Start the backend on `http://localhost:8000`
+- Start the frontend on `http://localhost:3000`
+- Run both in the background with log monitoring
+
+**Stop all servers:**
 ```bash
-npm run dev
+./stop.sh
 ```
 
-The frontend will be available at `http://localhost:3000`
+**View logs:**
+```bash
+# Real-time monitoring
+./logs.sh
+
+# Or view individual logs
+tail -f logs/backend.log
+tail -f logs/frontend.log
+```
+
+### Manual Setup (Alternative)
+
+If you prefer to run services individually:
+
+**Backend:**
+```bash
+./run_backend.sh
+```
+
+**Frontend:**
+```bash
+./run_frontend.sh
+```
 
 ## Usage
 
@@ -129,31 +139,34 @@ The frontend will be available at `http://localhost:3000`
 
 ## Configuration
 
-### LLM Providers
+### Environment Variables
 
-Default provider in `.env`:
-```
+Available settings in `.env`:
+
+```bash
+# Required
+OPENAI_API_KEY=your_openai_key_here
+
+# Optional (with defaults)
 DEFAULT_PROVIDER=openai
-DEFAULT_OPENAI_MODEL=gpt-4
-DEFAULT_ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
-```
+DEFAULT_OPENAI_MODEL=gpt-4o
 
-You can override per message via the API:
-```json
-{
-  "content": "Your message",
-  "provider": "anthropic",
-  "model": "claude-3-5-sonnet-20241022"
-}
-```
-
-### Summarization
-
-Configure which model summarizes threads:
-```
+# Summarization (disabled by default for OpenAI Responses API)
+ENABLE_SUMMARIZATION=false
 SUMMARIZATION_PROVIDER=openai
-SUMMARIZATION_MODEL=gpt-4
+SUMMARIZATION_MODEL=gpt-4o
 ```
+
+### OpenAI Responses API
+
+This application uses OpenAI's Responses API with native branching support via `previous_response_id`:
+
+- **Stateful conversations**: Context maintained by OpenAI automatically
+- **Native branching**: Branch from any message with full context preserved
+- **Token efficient**: No need to resend full conversation history
+- **Better caching**: Improved performance and lower costs
+
+See `IMPLEMENTATION_NOTES.md` for technical details.
 
 ## Development
 
@@ -169,7 +182,6 @@ thoughts/
 │   ├── services/         # Business logic
 │   │   ├── llm_provider.py
 │   │   ├── openai_provider.py
-│   │   ├── anthropic_provider.py
 │   │   ├── provider_factory.py
 │   │   ├── summarizer.py
 │   │   └── thread_service.py
@@ -177,7 +189,7 @@ thoughts/
 │   ├── schemas.py        # Pydantic schemas
 │   ├── database.py       # Database setup
 │   ├── config.py         # Configuration
-│   └── main.py          # FastAPI app
+│   └── main.py           # FastAPI app
 ├── frontend/
 │   ├── src/
 │   │   ├── components/   # React components
@@ -186,17 +198,26 @@ thoughts/
 │   │   ├── App.tsx
 │   │   └── main.tsx
 │   └── package.json
+├── start.sh              # Start all servers
+├── stop.sh               # Stop all servers
+├── logs.sh               # Monitor logs
+├── run_backend.sh        # Start backend only
+├── run_frontend.sh       # Start frontend only
+├── setup.sh              # Initial setup
 ├── requirements.txt
-├── .gitignore
 └── README.md
 ```
 
 ### Adding New LLM Providers
 
-1. Create new provider class in `backend/services/`
-2. Implement `LLMProvider` interface
-3. Register in `provider_factory.py`
-4. Add configuration to `.env`
+The architecture supports multiple providers. To add a new one:
+
+1. Create provider class in `backend/services/` implementing `LLMProvider`
+2. Register in `provider_factory.py`
+3. Add configuration to `.env`
+4. Enable `ENABLE_SUMMARIZATION=true` if provider doesn't support stateful conversations
+
+Example: See `backend/services/openai_provider.py` for reference implementation.
 
 ## Future Enhancements
 
