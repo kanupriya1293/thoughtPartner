@@ -1,110 +1,94 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Thread } from '../types/thread';
-import { threadsApi } from '../services/api';
+import { threadsApi, messagesApi } from '../services/api';
+import RootThreadsList from './RootThreadsList';
 
 const HomeScreen: React.FC = () => {
-  const [rootThreads, setRootThreads] = useState<Thread[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    loadRootThreads();
-  }, []);
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!inputValue.trim() || isLoading) return;
 
-  const loadRootThreads = async () => {
+    const messageContent = inputValue;
+    setInputValue('');
     setIsLoading(true);
     setError(null);
+
     try {
-      const threads = await threadsApi.getRootThreads();
-      setRootThreads(threads);
+      // Create a new thread first
+      const newThread = await threadsApi.createThread({});
+      
+      // Send the first message
+      await messagesApi.sendMessage(newThread.id, { content: messageContent }, true);
+      
+      // Navigate to the chat view
+      navigate(`/chat/${newThread.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to load threads');
-      console.error('Error loading root threads:', err);
+      setError(err.message || 'Failed to create thread and send message');
+      console.error('Error creating thread and sending message:', err);
+      // Restore input on error
+      setInputValue(messageContent);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateNewThread = async () => {
-    try {
-      const newThread = await threadsApi.createThread({});
-      navigate(`/chat/${newThread.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create thread');
-      console.error('Error creating thread:', err);
-    }
-  };
-
-  const handleThreadClick = (threadId: string) => {
-    navigate(`/chat/${threadId}`);
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="home-screen">
-        <div className="loading">Loading threads...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="home-screen">
-      <div className="home-header">
-        <h1>Your Conversations</h1>
-        <button className="btn-new-thread" onClick={handleCreateNewThread}>
-          + New Thread
-        </button>
+    <div className="home-screen-with-sidebar">
+      <div className="home-sidebar">
+        <RootThreadsList 
+          currentThreadId=""
+          currentRootId=""
+          currentThread={null}
+        />
       </div>
+      
+      <div className="home-screen">
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="error-message">
-          {error}
+        <div className="home-content">
+          <div className="home-input-container">
+            <h1 className="home-title">Start a conversation</h1>
+            <p className="home-subtitle">Type your message below to begin</p>
+            
+            <form className="home-input-form" onSubmit={handleSendMessage}>
+              <textarea
+                ref={inputRef}
+                className="home-input"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                  }
+                }}
+                placeholder="Type your message... (Shift+Enter for new line)"
+                rows={6}
+                disabled={isLoading}
+                autoFocus
+              />
+              <button 
+                type="submit" 
+                className="btn-send-home"
+                disabled={isLoading || !inputValue.trim()}
+              >
+                {isLoading ? 'Starting conversation...' : 'Send'}
+              </button>
+            </form>
+          </div>
         </div>
-      )}
-
-      {rootThreads.length === 0 ? (
-        <div className="empty-state">
-          <p>No conversations yet. Start a new one!</p>
-          <button className="btn-new-thread-large" onClick={handleCreateNewThread}>
-            Create Your First Thread
-          </button>
-        </div>
-      ) : (
-        <div className="threads-grid">
-          {rootThreads.map((thread) => (
-            <div
-              key={thread.id}
-              className="thread-card"
-              onClick={() => handleThreadClick(thread.id)}
-            >
-              <h3 className="thread-title">{thread.title || 'Untitled Thread'}</h3>
-              <p className="thread-date">{formatDate(thread.created_at)}</p>
-              {thread.summary && (
-                <p className="thread-summary">{thread.summary}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -51,14 +51,9 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentThreadId, curr
     }
   };
 
-  const handleCreateNewThread = async () => {
-    try {
-      const newThread = await threadsApi.createThread({});
-      navigate(`/chat/${newThread.id}`);
-      await loadRootThreads(); // Refresh the list
-    } catch (error) {
-      console.error('Error creating thread:', error);
-    }
+  const handleCreateNewThread = () => {
+    // Simply navigate to home page where user can type a message to create a thread
+    navigate('/');
   };
 
   const handleThreadClick = (threadId: string) => {
