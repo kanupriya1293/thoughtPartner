@@ -24,6 +24,12 @@ export const threadsApi = {
     return response.data;
   },
 
+  // Get all root threads (depth = 0)
+  getRootThreads: async (): Promise<Thread[]> => {
+    const response = await api.get<Thread[]>('/threads?depth=0');
+    return response.data;
+  },
+
   // Get child threads
   getChildren: async (threadId: string): Promise<Thread[]> => {
     const response = await api.get<Thread[]>(`/threads/${threadId}/children`);

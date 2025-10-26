@@ -15,25 +15,69 @@ class OpenAIProvider(LLMProvider):
         self, 
         messages: List[Dict[str, str]], 
         model: Optional[str] = None,
+        previous_response_id: Optional[str] = None,
         **kwargs
     ) -> Tuple[str, int, Dict]:
-        """Send messages to OpenAI API"""
+        """Send messages to OpenAI Responses API"""
         model_to_use = model or self.default_model
         
-        response = await self.client.chat.completions.create(
-            model=model_to_use,
-            messages=messages,
-            **kwargs
-        )
+        # Separate system messages (instructions) from user/assistant messages
+        system_messages = []
+        conversation_messages = []
         
-        content = response.choices[0].message.content
+        for msg in messages:
+            if msg["role"] == "system":
+                system_messages.append(msg["content"])
+            else:
+                conversation_messages.append(msg)
+        
+        # Combine system messages into instructions
+        instructions = "\n\n".join(system_messages) if system_messages else None
+        
+        # Get the last user message as input (for Responses API)
+        # The previous context is handled via previous_response_id
+        input_message = conversation_messages[-1]["content"] if conversation_messages else ""
+        
+        # Build request parameters
+        request_params = {
+            "model": model_to_use,
+            "input": input_message,
+        }
+        
+        if instructions:
+            request_params["instructions"] = instructions
+        
+        if previous_response_id:
+            request_params["previous_response_id"] = previous_response_id
+        
+        # Add other kwargs if provided
+        if "temperature" in kwargs:
+            request_params["temperature"] = kwargs["temperature"]
+        if "max_tokens" in kwargs:
+            request_params["max_output_tokens"] = kwargs["max_tokens"]
+        
+        # Call Responses API
+        response = await self.client.responses.create(**request_params)
+        
+        # Extract content from response
+        content = response.output_text if hasattr(response, 'output_text') else ""
+        if not content and response.output:
+            # Fallback: extract from output array
+            for item in response.output:
+                if item.get("type") == "message" and item.get("role") == "assistant":
+                    for content_item in item.get("content", []):
+                        if content_item.get("type") == "output_text":
+                            content = content_item.get("text", "")
+                            break
+        
         tokens_used = response.usage.total_tokens
         
         metadata = {
-            "model": model_to_use,
-            "finish_reason": response.choices[0].finish_reason,
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens,
+            "model": response.model,
+            "status": response.status,
+            "response_id": response.id,  # Store the response ID for branching
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
         }
         
         return content, tokens_used, metadata

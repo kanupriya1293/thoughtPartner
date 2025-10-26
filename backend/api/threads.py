@@ -1,12 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from ..database import get_db
 from ..schemas import ThreadCreate, ThreadResponse
 from ..services.thread_service import ThreadService
 
 router = APIRouter(prefix="/threads", tags=["threads"])
+
+
+@router.get("", response_model=List[ThreadResponse])
+async def get_threads(
+    depth: Optional[int] = Query(None, description="Filter threads by depth (e.g., 0 for root threads)"),
+    db: Session = Depends(get_db)
+):
+    """Get all threads, optionally filtered by depth"""
+    service = ThreadService(db)
+    threads = service.get_threads_by_depth(depth)
+    return threads
 
 
 @router.post("", response_model=ThreadResponse, status_code=201)

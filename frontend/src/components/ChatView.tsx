@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Thread } from '../types/thread';
 import { Message as MessageType } from '../types/message';
 import { messagesApi, threadsApi } from '../services/api';
 import MessageList from './MessageList';
-import ThreadNavigator from './ThreadNavigator';
+import RootThreadsList from './RootThreadsList';
 
-interface ChatViewProps {
-  threadId: string;
-  onThreadChange: (threadId: string) => void;
-}
-
-const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
+const ChatView: React.FC = () => {
+  const { threadId } = useParams<{ threadId: string }>();
+  const navigate = useNavigate();
   const [thread, setThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -19,7 +17,9 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadThread();
+    if (threadId) {
+      loadThread();
+    }
   }, [threadId]);
 
   useEffect(() => {
@@ -31,6 +31,8 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
   };
 
   const loadThread = async () => {
+    if (!threadId) return;
+    
     setIsLoading(true);
     setError(null);
     try {
@@ -48,7 +50,7 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || !threadId) return;
 
     const messageContent = inputValue;
     setInputValue('');
@@ -72,6 +74,8 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
   };
 
   const handleCreateBranch = async (messageId: string, contextText?: string) => {
+    if (!threadId) return;
+    
     try {
       const newThread = await threadsApi.createThread({
         parent_thread_id: threadId,
@@ -80,19 +84,32 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
       });
       
       // Switch to the new branch
-      onThreadChange(newThread.id);
+      navigate(`/chat/${newThread.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create branch');
       console.error('Error creating branch:', err);
     }
   };
 
+  const handleBranchClick = (branchThreadId: string) => {
+    navigate(`/chat/${branchThreadId}`);
+  };
+
+  if (!threadId) {
+    return (
+      <div className="chat-view">
+        <div className="error-message">No thread ID provided</div>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-view">
       <div className="chat-sidebar">
-        <ThreadNavigator 
-          currentThread={thread} 
-          onThreadChange={onThreadChange}
+        <RootThreadsList 
+          currentThreadId={threadId}
+          currentRootId={thread?.root_id || threadId}
+          currentThread={thread}
         />
       </div>
       
@@ -110,7 +127,7 @@ const ChatView: React.FC<ChatViewProps> = ({ threadId, onThreadChange }) => {
         <div className="chat-messages">
           <MessageList
             messages={messages}
-            onBranchClick={onThreadChange}
+            onBranchClick={handleBranchClick}
             onCreateBranch={handleCreateBranch}
           />
           <div ref={messagesEndRef} />

@@ -77,7 +77,29 @@ async def send_message(
         await service.update_thread_title(thread_id)
     
     # Assemble context for LLM
-    messages_for_llm = await _assemble_llm_context(thread_id, db)
+    messages_for_llm = await _assemble_llm_context(thread_id, message_data.provider, db)
+    
+    # Get previous response ID for OpenAI Responses API
+    previous_response_id = None
+    if message_data.provider == "openai":
+        # First, check if there are any assistant messages in this thread
+        last_assistant_msg = db.query(Message).filter(
+            Message.thread_id == thread_id,
+            Message.role == MessageRole.ASSISTANT,
+            Message.openai_response_id.isnot(None)
+        ).order_by(Message.sequence.desc()).first()
+        
+        if last_assistant_msg:
+            # Continue from last assistant message in this thread
+            previous_response_id = last_assistant_msg.openai_response_id
+        elif thread.parent_thread_id and thread.branch_from_message_id:
+            # This is a child thread with no messages yet - branch from parent
+            branch_from_msg = db.query(Message).filter(
+                Message.id == thread.branch_from_message_id
+            ).first()
+            
+            if branch_from_msg and branch_from_msg.openai_response_id:
+                previous_response_id = branch_from_msg.openai_response_id
     
     # Get LLM provider
     provider_name = message_data.provider
@@ -92,7 +114,8 @@ async def send_message(
     try:
         response_content, tokens_used, metadata = await provider.send_message(
             messages_for_llm,
-            model=model
+            model=model,
+            previous_response_id=previous_response_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM API error: {str(e)}")
@@ -106,7 +129,8 @@ async def send_message(
         model=metadata.get("model"),
         provider=provider.provider_name,
         tokens_used=tokens_used,
-        response_metadata=metadata
+        response_metadata=metadata,
+        openai_response_id=metadata.get("response_id")  # Store for branching
     )
     db.add(assistant_message)
     db.commit()
@@ -115,9 +139,14 @@ async def send_message(
     return assistant_message
 
 
-async def _assemble_llm_context(thread_id: str, db: Session) -> List[dict]:
+async def _assemble_llm_context(thread_id: str, provider: str, db: Session) -> List[dict]:
     """
     Assemble context for LLM call
+    
+    Args:
+        thread_id: Thread ID
+        provider: Provider name (openai, anthropic, etc.)
+        db: Database session
     
     Returns:
         List of message dicts for LLM
@@ -131,16 +160,22 @@ async def _assemble_llm_context(thread_id: str, db: Session) -> List[dict]:
                   "Provide clear, thoughtful responses that encourage further inquiry."
     })
     
-    # 2. Parent context (if exists)
-    context = db.query(ThreadContext).filter(
-        ThreadContext.thread_id == thread_id
-    ).first()
+    # 2. Parent context (if exists and summarization is enabled)
+    # Note: For OpenAI Responses API with previous_response_id, the parent context
+    # is already maintained by OpenAI via previous_response_id
+    # Summaries are only needed if enable_summarization=True (for other providers)
+    from ..config import settings
     
-    if context and context.parent_summary:
-        messages.append({
-            "role": "system",
-            "content": f"Context from previous discussion:\n{context.parent_summary}"
-        })
+    if settings.enable_summarization:
+        context = db.query(ThreadContext).filter(
+            ThreadContext.thread_id == thread_id
+        ).first()
+        
+        if context and context.parent_summary:
+            messages.append({
+                "role": "system",
+                "content": f"Context from previous discussion:\n{context.parent_summary}"
+            })
     
     # 3. Current thread messages
     thread_messages = db.query(Message).filter(

@@ -44,6 +44,7 @@ class Message(Base):
     provider = Column(String, nullable=True)
     tokens_used = Column(Integer, nullable=True)
     response_metadata = Column(JSON, nullable=True)
+    openai_response_id = Column(String, nullable=True)  # For Responses API branching
 
     # Relationships
     thread = relationship("Thread", back_populates="messages", foreign_keys=[thread_id])

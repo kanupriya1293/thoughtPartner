@@ -73,8 +73,11 @@ class ThreadService:
         self.db.commit()
         self.db.refresh(thread)
         
-        # Generate parent summary if this is a branch
-        if parent_thread_id:
+        # Generate parent summary if this is a branch and summarization is enabled
+        # OpenAI Responses API doesn't need this (uses previous_response_id)
+        # But useful for other providers or analysis purposes
+        from ..config import settings
+        if parent_thread_id and settings.enable_summarization:
             parent_summary, _ = await self.summarizer.generate_parent_summary(
                 parent_thread_id,
                 up_to_message_id=branch_from_message_id
@@ -95,6 +98,21 @@ class ThreadService:
         return self.db.query(Thread).filter(
             Thread.parent_thread_id == thread_id
         ).order_by(Thread.created_at).all()
+    
+    def get_threads_by_depth(self, depth: Optional[int] = None) -> List[Thread]:
+        """
+        Get threads, optionally filtered by depth
+        
+        Args:
+            depth: Filter by depth (e.g., 0 for root threads). If None, returns all threads.
+        
+        Returns:
+            List of Thread objects
+        """
+        query = self.db.query(Thread)
+        if depth is not None:
+            query = query.filter(Thread.depth == depth)
+        return query.order_by(Thread.created_at.desc()).all()
     
     def get_messages_with_branches(self, thread_id: str) -> List[Dict]:
         """

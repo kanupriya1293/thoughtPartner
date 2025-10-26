@@ -29,24 +29,15 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.app-header h1 {
+.app-logo h1 {
   font-size: 1.5rem;
   font-weight: 600;
+  margin: 0;
+  transition: opacity 0.2s;
 }
 
-.btn-new-thread {
-  background-color: #3498db;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.btn-new-thread:hover {
-  background-color: #2980b9;
+.app-logo:hover h1 {
+  opacity: 0.8;
 }
 
 .app-main {
@@ -158,10 +149,119 @@ body {
   gap: 1rem;
 }
 
+/* Home Screen */
+.home-screen {
+  padding: 2rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.home-header h1 {
+  font-size: 2rem;
+  color: #2c3e50;
+}
+
+.btn-new-thread {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-new-thread:hover {
+  background-color: #2980b9;
+}
+
+.btn-new-thread-large {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.btn-new-thread-large:hover {
+  background-color: #2980b9;
+}
+
+.threads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.thread-card {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.thread-card:hover {
+  border-color: #3498db;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+  transform: translateY(-2px);
+}
+
+.thread-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.thread-date {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-bottom: 0.75rem;
+}
+
+.thread-summary {
+  font-size: 0.9rem;
+  color: #5a6c7d;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
 .empty-state {
   text-align: center;
   color: #7f8c8d;
   padding: 3rem;
+}
+
+.empty-state p {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.loading {
+  text-align: center;
+  color: #7f8c8d;
+  padding: 3rem;
+  font-size: 1.1rem;
 }
 
 /* Message */
@@ -291,81 +391,72 @@ body {
   font-style: italic;
 }
 
-/* Thread Navigator */
-.thread-navigator {
+/* Root Threads List */
+.root-threads-list {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  height: 100%;
 }
 
-.thread-info h3 {
-  font-size: 1.1rem;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.thread-metadata {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #7f8c8d;
-}
-
-.badge-root {
-  background-color: #e67e22;
+.btn-new-thread-sidebar {
+  background-color: #3498db;
   color: white;
-  padding: 0.15rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.75rem;
-}
-
-.nav-section {
-  margin-top: 1rem;
-}
-
-.nav-section h4 {
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
   font-size: 0.9rem;
-  color: #7f8c8d;
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  transition: background-color 0.2s;
 }
 
-.nav-list {
+.btn-new-thread-sidebar:hover {
+  background-color: #2980b9;
+}
+
+.threads-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  overflow-y: auto;
 }
 
-.nav-item {
+.thread-item {
   background-color: white;
   border: 1px solid #ddd;
-  padding: 0.5rem;
-  border-radius: 4px;
+  padding: 0.75rem;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   font-size: 0.9rem;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
 }
 
-.nav-item:hover {
-  background-color: #3498db;
-  color: white;
+.thread-item:hover {
+  background-color: #f8f9fa;
   border-color: #3498db;
 }
 
-.btn-go-root {
-  width: 100%;
-  padding: 0.75rem;
-  background-color: #e67e22;
+.thread-item.active {
+  background-color: #3498db;
   color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  border-color: #3498db;
   font-weight: 500;
 }
 
-.btn-go-root:hover {
-  background-color: #d35400;
+.thread-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loading-small {
+  text-align: center;
+  color: #7f8c8d;
+  padding: 1rem;
+  font-size: 0.9rem;
 }
 

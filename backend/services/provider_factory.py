@@ -1,6 +1,5 @@
 from .llm_provider import LLMProvider
 from .openai_provider import OpenAIProvider
-from .anthropic_provider import AnthropicProvider
 from ..config import settings
 
 
@@ -9,7 +8,6 @@ class ProviderFactory:
     
     _providers = {
         "openai": OpenAIProvider,
-        "anthropic": AnthropicProvider,
     }
     
     @classmethod
