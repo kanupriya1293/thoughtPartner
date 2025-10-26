@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface BranchHighlight {
   threadId: string;
@@ -23,76 +23,84 @@ interface TextSegment {
 
 const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, onBranchClick }) => {
   const [showMenu, setShowMenu] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0, width: 0 });
+  const [menuBranches, setMenuBranches] = useState<BranchHighlight[]>([]);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Convert branches to segments with proper offsets
   const segments: TextSegment[] = [];
   
   if (branches.length === 0) {
-    // No highlights, return plain text
     return <span>{content}</span>;
   }
 
   // Sort branches by start offset
   const sortedBranches = [...branches].sort((a, b) => a.startOffset - b.startOffset);
 
-  // Generate segments
-  let currentOffset = 0;
-  
-  sortedBranches.forEach((branch) => {
-    // Add text before this highlight
-    if (currentOffset < branch.startOffset) {
-      const textBefore = content.substring(currentOffset, branch.startOffset);
-      if (textBefore) {
-        segments.push({
-          text: textBefore,
-          startOffset: currentOffset,
-          endOffset: branch.startOffset,
-          branches: []
-        });
-      }
-    }
-
-    // Add the highlighted segment
-    const highlightedText = content.substring(branch.startOffset, branch.endOffset);
-    segments.push({
-      text: highlightedText,
-      startOffset: branch.startOffset,
-      endOffset: branch.endOffset,
-      branches: [branch]
-    });
-
-    currentOffset = branch.endOffset;
+  // Collect ALL unique boundaries (start and end positions)
+  const boundaries = new Set<number>();
+  boundaries.add(0);
+  boundaries.add(content.length);
+  sortedBranches.forEach(branch => {
+    boundaries.add(branch.startOffset);
+    boundaries.add(branch.endOffset);
   });
 
-  // Add remaining text after last highlight
-  if (currentOffset < content.length) {
-    const textAfter = content.substring(currentOffset);
-    if (textAfter) {
-      segments.push({
-        text: textAfter,
-        startOffset: currentOffset,
-        endOffset: content.length,
-        branches: []
-      });
-    }
+  const sortedBoundaries = Array.from(boundaries).sort((a, b) => a - b);
+
+  // Create a segment for each gap between boundaries
+  for (let i = 0; i < sortedBoundaries.length - 1; i++) {
+    const start = sortedBoundaries[i];
+    const end = sortedBoundaries[i + 1];
+    
+    // Find all branches that contain this segment (overlapping branches)
+    const containingBranches = sortedBranches.filter(branch => 
+      branch.startOffset <= start && branch.endOffset >= end
+    );
+
+    segments.push({
+      text: content.substring(start, end),
+      startOffset: start,
+      endOffset: end,
+      branches: containingBranches
+    });
   }
 
-  const handleHighlightClick = (e: React.MouseEvent, segment: TextSegment) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleHighlightHover = (e: React.MouseEvent, segment: TextSegment) => {
+    // Clear any pending hide timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+
     if (segment.branches.length === 0) {
       return;
     }
 
     if (segment.branches.length === 1) {
+      // Single branch, don't show menu (or show a simple tooltip)
+      return;
+    }
+
+    // Multiple branches, show menu with only this segment's branches
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPosition({ x: rect.left, y: rect.bottom + 4, width: rect.width }); // Position below the text
+    setMenuBranches(segment.branches);
+    setShowMenu(true);
+  };
+
+  const handleHighlightLeave = () => {
+    // Delay hiding the menu to allow for mouse to move to it
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowMenu(false);
+      hideTimeoutRef.current = null;
+    }, 100);
+  };
+
+  const handleHighlightClick = (e: React.MouseEvent, segment: TextSegment) => {
+    if (segment.branches.length === 1) {
       // Single branch, open directly
       onBranchClick(segment.branches[0].threadId);
-    } else {
-      // Multiple branches, show menu
-      setMenuPosition({ x: e.clientX, y: e.clientY });
-      setShowMenu(!showMenu);
     }
   };
 
@@ -102,15 +110,16 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
   };
 
   return (
-    <div className="relative">
+    <div className="relative inline-block w-full">
       <span>
         {segments.map((segment, idx) => (
           segment.branches.length > 0 ? (
             <span
               key={idx}
-              className="bg-yellow-100 hover:bg-yellow-200 cursor-pointer rounded px-0.5 transition-colors"
+              className="bg-yellow-100 hover:bg-yellow-200 cursor-pointer rounded px-0.5 transition-colors relative"
               onClick={(e) => handleHighlightClick(e, segment)}
-              title={segment.branches.length === 1 ? segment.branches[0].title : `${segment.branches.length} branches`}
+              onMouseEnter={(e) => handleHighlightHover(e, segment)}
+              onMouseLeave={handleHighlightLeave}
             >
               {segment.text}
             </span>
@@ -121,26 +130,33 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
       </span>
 
       {/* Popup menu for multiple branches */}
-      {showMenu && segments.filter(s => s.branches.length > 1).length > 0 && (
+      {showMenu && menuBranches.length > 0 && (
         <div 
-          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[200px] py-1"
-          style={{ left: menuPosition.x, top: menuPosition.y }}
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-[300px] py-1 mt-1"
+          style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
+          onMouseEnter={() => {
+            // Clear any pending hide timeout when entering menu
+            if (hideTimeoutRef.current) {
+              clearTimeout(hideTimeoutRef.current);
+              hideTimeoutRef.current = null;
+            }
+            setShowMenu(true);
+          }}
+          onMouseLeave={() => setShowMenu(false)}
           onClick={(e) => e.stopPropagation()}
         >
-          {segments.map(segment => 
-            segment.branches.map((branch) => (
-              <button
-                key={branch.threadId}
-                className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
-                onClick={() => handleBranchFromMenu(branch.threadId)}
-              >
-                <div className="text-sm font-medium text-gray-900">{branch.title}</div>
-                {branch.contextText && (
-                  <div className="text-xs text-gray-500 truncate">{branch.contextText.substring(0, 40)}...</div>
-                )}
-              </button>
-            ))
-          )}
+          {menuBranches.map((branch) => (
+            <button
+              key={branch.threadId}
+              className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
+              onClick={() => handleBranchFromMenu(branch.threadId)}
+            >
+              <div className="text-sm font-medium text-gray-900 truncate">{branch.title}</div>
+              {branch.contextText && (
+                <div className="text-xs text-gray-500 truncate">{branch.contextText}</div>
+              )}
+            </button>
+          ))}
         </div>
       )}
     </div>
