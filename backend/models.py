@@ -24,6 +24,8 @@ class Thread(Base):
     title = Column(String, nullable=True)
     branch_from_message_id = Column(String, ForeignKey("messages.id"), nullable=True)
     branch_context_text = Column(Text, nullable=True)
+    branch_text_start_offset = Column(Integer, nullable=True)
+    branch_text_end_offset = Column(Integer, nullable=True)
 
     # Relationships
     messages = relationship("Message", back_populates="thread", foreign_keys="Message.thread_id")

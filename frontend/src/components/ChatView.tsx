@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Thread } from '../types/thread';
 import { Message as MessageType } from '../types/message';
@@ -16,6 +16,8 @@ interface ChatViewProps {
       parentThreadId: string;
       messageId: string;
       contextText?: string;
+      startOffset?: number;
+      endOffset?: number;
     }
   ) => void;
   onCloseOverlay: () => void;
@@ -37,8 +39,27 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
   const [selection, setSelection] = useState<{
     messageId: string;
     selectedText: string;
+    startOffset: number;
+    endOffset: number;
     position: { x: number; y: number };
   } | null>(null);
+
+  const loadThread = useCallback(async () => {
+    if (!threadId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await messagesApi.getMessages(threadId);
+      setThread(data.thread_info);
+      setMessages(data.messages);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load thread');
+      console.error('Error loading thread:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [threadId]);
 
   useEffect(() => {
     if (threadId) {
@@ -59,7 +80,21 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
         inputRef.current?.setSelectionRange(quotedText.length, quotedText.length);
       }, 100);
     }
-  }, [threadId, location]);
+  }, [threadId, location, loadThread]);
+
+  // Listen for branch created event to reload thread
+  useEffect(() => {
+    const handleBranchCreated = () => {
+      if (threadId) {
+        loadThread();
+      }
+    };
+
+    window.addEventListener('branchCreated', handleBranchCreated);
+    return () => {
+      window.removeEventListener('branchCreated', handleBranchCreated);
+    };
+  }, [threadId, loadThread]);
 
   useEffect(() => {
     scrollToBottom();
@@ -67,23 +102,6 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const loadThread = async () => {
-    if (!threadId) return;
-    
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await messagesApi.getMessages(threadId);
-      setThread(data.thread_info);
-      setMessages(data.messages);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load thread');
-      console.error('Error loading thread:', err);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -134,8 +152,8 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     onOpenOverlay(branchThreadId, branch?.title || 'Branch');
   };
 
-  const handleTextSelection = (messageId: string, selectedText: string, position: { x: number; y: number }) => {
-    setSelection({ messageId, selectedText, position });
+  const handleTextSelection = (messageId: string, selectedText: string, startOffset: number, endOffset: number, position: { x: number; y: number }) => {
+    setSelection({ messageId, selectedText, startOffset, endOffset, position });
   };
 
   const handleCloseSelection = () => {
@@ -169,7 +187,9 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     onOpenOverlay(undefined, 'New Branch', quotedText, {
       parentThreadId: threadId,
       messageId: selection.messageId,
-      contextText: selection.selectedText
+      contextText: selection.selectedText,
+      startOffset: selection.startOffset,
+      endOffset: selection.endOffset
     });
   };
 

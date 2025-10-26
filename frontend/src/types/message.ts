@@ -20,6 +20,8 @@ export interface BranchInfo {
   thread_id: string;
   title: string | null;
   branch_context_text: string | null;
+  branch_text_start_offset?: number | null;
+  branch_text_end_offset?: number | null;
 }
 
 export interface MessageCreate {

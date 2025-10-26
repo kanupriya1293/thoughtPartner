@@ -15,7 +15,9 @@ class ThreadService:
         self,
         parent_thread_id: Optional[str] = None,
         branch_from_message_id: Optional[str] = None,
-        branch_context_text: Optional[str] = None
+        branch_context_text: Optional[str] = None,
+        branch_text_start_offset: Optional[int] = None,
+        branch_text_end_offset: Optional[int] = None
     ) -> Thread:
         """
         Create a new thread (root or branch)
@@ -66,7 +68,9 @@ class ThreadService:
             root_id=root_id,
             depth=depth,
             branch_from_message_id=branch_from_message_id,
-            branch_context_text=branch_context_text
+            branch_context_text=branch_context_text,
+            branch_text_start_offset=branch_text_start_offset,
+            branch_text_end_offset=branch_text_end_offset
         )
         
         self.db.add(thread)
@@ -156,7 +160,9 @@ class ThreadService:
                     {
                         "thread_id": child.id,
                         "title": child.title,
-                        "branch_context_text": child.branch_context_text
+                        "branch_context_text": child.branch_context_text,
+                        "branch_text_start_offset": child.branch_text_start_offset,
+                        "branch_text_end_offset": child.branch_text_end_offset
                     }
                     for child in message_branches.get(msg.id, [])
                 ]

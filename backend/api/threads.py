@@ -32,7 +32,9 @@ async def create_thread(
         thread = await service.create_thread(
             parent_thread_id=thread_data.parent_thread_id,
             branch_from_message_id=thread_data.branch_from_message_id,
-            branch_context_text=thread_data.branch_context_text
+            branch_context_text=thread_data.branch_context_text,
+            branch_text_start_offset=thread_data.branch_text_start_offset,
+            branch_text_end_offset=thread_data.branch_text_end_offset
         )
         return thread
     except ValueError as e:

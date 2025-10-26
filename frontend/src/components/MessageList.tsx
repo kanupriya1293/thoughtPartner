@@ -6,7 +6,7 @@ interface MessageListProps {
   messages: MessageType[];
   onBranchClick: (threadId: string) => void;
   onCreateBranch: (messageId: string, contextText?: string) => void;
-  onTextSelection?: (messageId: string, selectedText: string, position: { x: number; y: number }) => void;
+  onTextSelection?: (messageId: string, selectedText: string, startOffset: number, endOffset: number, position: { x: number; y: number }) => void;
   onDeleteBranch?: (threadId: string) => void;
 }
 

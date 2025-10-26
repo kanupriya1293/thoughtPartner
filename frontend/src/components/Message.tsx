@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
 import { Message as MessageType } from '../types/message';
 import BranchIndicator from './BranchIndicator';
+import HighlightedText from './HighlightedText';
 
 interface MessageProps {
   message: MessageType;
   onBranchClick: (threadId: string) => void;
   onCreateBranch: (messageId: string, contextText?: string) => void;
-  onTextSelection?: (messageId: string, selectedText: string, position: { x: number; y: number }) => void;
+  onTextSelection?: (messageId: string, selectedText: string, startOffset: number, endOffset: number, position: { x: number; y: number }) => void;
   onDeleteBranch?: (threadId: string) => void;
 }
 
@@ -24,7 +25,16 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
       const range = selection?.getRangeAt(0);
       const rect = range?.getBoundingClientRect();
       
-      if (rect) {
+      if (rect && contentRef.current) {
+        // Calculate character offsets
+        // Create a range from start of message content to selection start
+        const preSelectionRange = document.createRange();
+        preSelectionRange.setStart(contentRef.current.firstChild || contentRef.current, 0);
+        preSelectionRange.setEnd(range.startContainer, range.startOffset);
+        
+        const startOffset = preSelectionRange.toString().length;
+        const endOffset = startOffset + selectedText.length;
+        
         // Menu dimensions
         const menuWidth = 192; // w-48 = 192px
         const menuHeight = 60;
@@ -61,7 +71,7 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
           y: y
         };
         
-        onTextSelection(message.id, selectedText, position);
+        onTextSelection(message.id, selectedText, startOffset, endOffset, position);
       }
     }
   };
@@ -75,7 +85,23 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
           className={`rounded-lg px-4 py-3 ${isUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'}`}
           onMouseUp={handleMouseUp}
         >
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          <p className="text-sm whitespace-pre-wrap">
+            {isUser || !message.branches || message.branches.length === 0 ? (
+              message.content
+            ) : (
+              <HighlightedText
+                content={message.content}
+                branches={message.branches.map(branch => ({
+                  threadId: branch.thread_id,
+                  title: branch.title || 'Branch',
+                  startOffset: branch.branch_text_start_offset || 0,
+                  endOffset: branch.branch_text_end_offset || 0,
+                  contextText: branch.branch_context_text || ''
+                }))}
+                onBranchClick={onBranchClick}
+              />
+            )}
+          </p>
         </div>
         
         {/* Footer with actions */}

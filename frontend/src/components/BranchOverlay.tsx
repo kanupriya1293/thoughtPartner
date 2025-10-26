@@ -20,6 +20,8 @@ interface BranchOverlayProps {
     parentThreadId: string;
     messageId: string;
     contextText?: string;
+    startOffset?: number;
+    endOffset?: number;
   };
 }
 
@@ -46,6 +48,8 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   const [selection, setSelection] = useState<{
     messageId: string;
     selectedText: string;
+    startOffset: number;
+    endOffset: number;
     position: { x: number; y: number };
   } | null>(null);
 
@@ -102,6 +106,8 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
           parent_thread_id: pendingBranch.parentThreadId,
           branch_from_message_id: pendingBranch.messageId,
           branch_context_text: pendingBranch.contextText,
+          branch_text_start_offset: pendingBranch.startOffset,
+          branch_text_end_offset: pendingBranch.endOffset,
         });
         targetThreadId = newThread.id;
         setThread(newThread);
@@ -169,8 +175,8 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     }
   };
 
-  const handleTextSelection = (messageId: string, selectedText: string, position: { x: number; y: number }) => {
-    setSelection({ messageId, selectedText, position });
+  const handleTextSelection = (messageId: string, selectedText: string, startOffset: number, endOffset: number, position: { x: number; y: number }) => {
+    setSelection({ messageId, selectedText, startOffset, endOffset, position });
   };
 
   const handleCloseSelection = () => {
@@ -184,7 +190,7 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   };
 
   const handleBranchFromSelection = async () => {
-    if (!selection) return;
+    if (!selection || !threadId) return;
     
     try {
       // Create new branch
@@ -192,6 +198,8 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
         parent_thread_id: threadId,
         branch_from_message_id: selection.messageId,
         branch_context_text: selection.selectedText,
+        branch_text_start_offset: selection.startOffset,
+        branch_text_end_offset: selection.endOffset,
       });
       
       setSelection(null);

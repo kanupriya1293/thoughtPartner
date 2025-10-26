@@ -14,6 +14,8 @@ class ThreadCreate(BaseModel):
     parent_thread_id: Optional[str] = None
     branch_from_message_id: Optional[str] = None
     branch_context_text: Optional[str] = None
+    branch_text_start_offset: Optional[int] = None
+    branch_text_end_offset: Optional[int] = None
 
 
 class ThreadResponse(BaseModel):
@@ -25,6 +27,8 @@ class ThreadResponse(BaseModel):
     title: Optional[str]
     branch_from_message_id: Optional[str]
     branch_context_text: Optional[str]
+    branch_text_start_offset: Optional[int] = None
+    branch_text_end_offset: Optional[int] = None
 
     class Config:
         from_attributes = True

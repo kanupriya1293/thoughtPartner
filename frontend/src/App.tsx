@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useParams, useLocation } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import HomeScreen from './components/HomeScreen';
 import ChatView from './components/ChatView';
 import BranchOverlay from './components/BranchOverlay';
@@ -102,6 +102,8 @@ interface OverlayThread {
     parentThreadId: string;
     messageId: string;
     contextText?: string;
+    startOffset?: number;
+    endOffset?: number;
   };
 }
 
@@ -123,6 +125,8 @@ function AppLayout() {
       parentThreadId: string;
       messageId: string;
       contextText?: string;
+      startOffset?: number;
+      endOffset?: number;
     }
   ) => {
     setOverlayStack([...overlayStack, { threadId: branchThreadId, title, initialText, pendingBranch }]);
@@ -155,6 +159,10 @@ function AppLayout() {
       }
       return newStack;
     });
+    
+    // Trigger reload of parent thread to show new highlight
+    // This will be handled by ChatView's onBranchCreated callback
+    window.dispatchEvent(new CustomEvent('branchCreated'));
   };
 
   const currentOverlayThread = overlayStack[overlayStack.length - 1];
