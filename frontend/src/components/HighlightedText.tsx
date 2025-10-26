@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import FloatingMenu from './FloatingMenu';
 
 interface BranchHighlight {
   threadId: string;
@@ -74,11 +75,14 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
     }
 
     if (segment.branches.length === 0) {
+      // No branches, hide menu if it's showing
+      setShowMenu(false);
       return;
     }
 
     if (segment.branches.length === 1) {
-      // Single branch, don't show menu (or show a simple tooltip)
+      // Single branch, don't show menu (hide it if it's showing)
+      setShowMenu(false);
       return;
     }
 
@@ -104,9 +108,8 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
     }
   };
 
-  const handleBranchFromMenu = (threadId: string) => {
+  const handleCloseMenu = () => {
     setShowMenu(false);
-    onBranchClick(threadId);
   };
 
   return (
@@ -129,36 +132,19 @@ const HighlightedText: React.FC<HighlightedTextProps> = ({ content, branches, on
         ))}
       </span>
 
-      {/* Popup menu for multiple branches */}
-      {showMenu && menuBranches.length > 0 && (
-        <div 
-          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-[300px] py-1 mt-1"
-          style={{ left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }}
-          onMouseEnter={() => {
-            // Clear any pending hide timeout when entering menu
-            if (hideTimeoutRef.current) {
-              clearTimeout(hideTimeoutRef.current);
-              hideTimeoutRef.current = null;
-            }
-            setShowMenu(true);
-          }}
-          onMouseLeave={() => setShowMenu(false)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menuBranches.map((branch) => (
-            <button
-              key={branch.threadId}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
-              onClick={() => handleBranchFromMenu(branch.threadId)}
-            >
-              <div className="text-sm font-medium text-gray-900 truncate">{branch.title}</div>
-              {branch.contextText && (
-                <div className="text-xs text-gray-500 truncate">{branch.contextText}</div>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Floating menu for multiple branches */}
+      <FloatingMenu
+        items={menuBranches.map((branch) => ({
+          id: branch.threadId,
+          label: branch.title,
+          onClick: () => onBranchClick(branch.threadId),
+        }))}
+        isOpen={showMenu}
+        onClose={handleCloseMenu}
+        position={{ x: menuPosition.x + menuPosition.width / 2, y: menuPosition.y }}
+        anchor="center"
+        closeOnBackdrop={false}
+      />
     </div>
   );
 };

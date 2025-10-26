@@ -16,9 +16,10 @@ interface FloatingMenuProps {
   onClose: () => void;
   position?: { x: number; y: number };
   anchor?: 'left' | 'right' | 'center';
+  closeOnBackdrop?: boolean;
 }
 
-export default function FloatingMenu({ items, isOpen, onClose, position, anchor = 'right' }: FloatingMenuProps) {
+export default function FloatingMenu({ items, isOpen, onClose, position, anchor = 'right', closeOnBackdrop = true }: FloatingMenuProps) {
   if (!isOpen) return null;
 
   // Calculate positioning with boundary checks
@@ -67,10 +68,12 @@ export default function FloatingMenu({ items, isOpen, onClose, position, anchor 
   return (
     <>
       {/* Backdrop to close menu */}
-      <div
-        className="fixed inset-0 z-40"
-        onClick={onClose}
-      />
+      {closeOnBackdrop && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={onClose}
+        />
+      )}
       
       {/* Menu */}
       <div
@@ -86,10 +89,8 @@ export default function FloatingMenu({ items, isOpen, onClose, position, anchor 
             }}
             className={`w-full flex items-center justify-between px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors ${item.className || ''}`}
           >
-            <div className="flex items-center space-x-2 flex-1 min-w-0">
-              <div className="w-3 h-3 flex-shrink-0 flex items-center justify-center">
-                {item.icon}
-              </div>
+            <div className="flex items-center flex-1 min-w-0">
+              {item.icon && <div className="w-3 h-3 flex-shrink-0 flex items-center justify-center mr-2">{item.icon}</div>}
               <span className="truncate text-left">{item.label}</span>
             </div>
             {item.suffix}
