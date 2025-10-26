@@ -26,5 +26,6 @@ export interface MessageCreate {
   content: string;
   provider?: string;
   model?: string;
+  background?: boolean;
 }
 

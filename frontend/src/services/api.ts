@@ -35,6 +35,11 @@ export const threadsApi = {
     const response = await api.get<Thread[]>(`/threads/${threadId}/children`);
     return response.data;
   },
+
+  // Delete a thread
+  deleteThread: async (threadId: string): Promise<void> => {
+    await api.delete(`/threads/${threadId}`);
+  },
 };
 
 export const messagesApi = {
@@ -45,8 +50,8 @@ export const messagesApi = {
   },
 
   // Send a message and get response
-  sendMessage: async (threadId: string, data: MessageCreate): Promise<Message> => {
-    const response = await api.post<Message>(`/threads/${threadId}/messages`, data);
+  sendMessage: async (threadId: string, data: MessageCreate, background: boolean = false): Promise<Message> => {
+    const response = await api.post<Message>(`/threads/${threadId}/messages`, { ...data, background });
     return response.data;
   },
 };

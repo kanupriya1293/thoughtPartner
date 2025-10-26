@@ -65,6 +65,32 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentThreadId, curr
     navigate(`/chat/${threadId}`);
   };
 
+  const handleDeleteThread = async (e: React.MouseEvent, threadId: string) => {
+    e.stopPropagation(); // Prevent thread click
+    
+    if (!window.confirm('Are you sure you want to delete this thread? All branches will also be deleted. This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await threadsApi.deleteThread(threadId);
+      await loadRootThreads(); // Refresh the list
+      
+      // If we deleted the current thread, navigate away
+      if (threadId === currentThreadId) {
+        const remainingThreads = rootThreads.filter(t => t.id !== threadId);
+        if (remainingThreads.length > 0) {
+          navigate(`/chat/${remainingThreads[0].id}`);
+        } else {
+          navigate('/');
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting thread:', error);
+      alert('Failed to delete thread');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="root-threads-list">
@@ -81,16 +107,24 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentThreadId, curr
 
       <div className="threads-list">
         {rootThreads.map((thread) => (
-          <button
-            key={thread.id}
-            className={`thread-item ${thread.id === currentRootId ? 'active' : ''}`}
-            onClick={() => handleThreadClick(thread.id)}
-            title={thread.title || 'Untitled Thread'}
-          >
-            <span className="thread-item-title">
-              {thread.title || 'Untitled Thread'}
-            </span>
-          </button>
+          <div key={thread.id} className={`thread-item ${thread.id === currentRootId ? 'active' : ''}`}>
+            <button
+              onClick={() => handleThreadClick(thread.id)}
+              title={thread.title || 'Untitled Thread'}
+              className="thread-item-button"
+            >
+              <span className="thread-item-title">
+                {thread.title || 'Untitled Thread'}
+              </span>
+            </button>
+            <button
+              onClick={(e) => handleDeleteThread(e, thread.id)}
+              className="thread-item-delete"
+              title="Delete thread"
+            >
+              ×
+            </button>
+          </div>
         ))}
       </div>
     </div>

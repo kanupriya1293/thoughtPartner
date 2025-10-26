@@ -6,9 +6,11 @@ interface MessageListProps {
   messages: MessageType[];
   onBranchClick: (threadId: string) => void;
   onCreateBranch: (messageId: string, contextText?: string) => void;
+  onTextSelection?: (messageId: string, selectedText: string, position: { x: number; y: number }) => void;
+  onDeleteBranch?: (threadId: string) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, onBranchClick, onCreateBranch }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages, onBranchClick, onCreateBranch, onTextSelection, onDeleteBranch }) => {
   return (
     <div className="message-list">
       {messages.length === 0 ? (
@@ -22,6 +24,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, onBranchClick, onCr
             message={message}
             onBranchClick={onBranchClick}
             onCreateBranch={onCreateBranch}
+            onTextSelection={onTextSelection}
+            onDeleteBranch={onDeleteBranch}
           />
         ))
       )}

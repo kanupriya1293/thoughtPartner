@@ -115,7 +115,8 @@ async def send_message(
         response_content, tokens_used, metadata = await provider.send_message(
             messages_for_llm,
             model=model,
-            previous_response_id=previous_response_id
+            previous_response_id=previous_response_id,
+            background=message_data.background
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM API error: {str(e)}")

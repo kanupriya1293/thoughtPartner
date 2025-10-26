@@ -34,6 +34,7 @@ class MessageCreate(BaseModel):
     content: str
     provider: Optional[str] = None
     model: Optional[str] = None
+    background: Optional[bool] = False
 
 
 class MessageResponse(BaseModel):

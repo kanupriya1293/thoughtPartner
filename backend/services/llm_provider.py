@@ -11,6 +11,7 @@ class LLMProvider(ABC):
         messages: List[Dict[str, str]], 
         model: Optional[str] = None,
         previous_response_id: Optional[str] = None,
+        background: Optional[bool] = False,
         **kwargs
     ) -> Tuple[str, int, Dict]:
         """
@@ -20,6 +21,7 @@ class LLMProvider(ABC):
             messages: List of message dicts with 'role' and 'content'
             model: Optional model override
             previous_response_id: Optional previous response ID for stateful APIs (e.g., OpenAI Responses API)
+            background: Whether to run the request in background mode (for parallel processing)
             **kwargs: Additional provider-specific parameters
             
         Returns:

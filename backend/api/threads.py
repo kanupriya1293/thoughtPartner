@@ -70,3 +70,46 @@ async def get_thread_children(
     children = service.get_children(thread_id)
     return children
 
+
+@router.delete("/{thread_id}")
+async def delete_thread(
+    thread_id: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a thread, all its messages, and all child branches (cascade delete)"""
+    from ..models import Thread, Message, ThreadContext
+    
+    # Verify thread exists
+    thread = db.query(Thread).filter(Thread.id == thread_id).first()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    # Recursively delete all child branches
+    def delete_branch_and_children(thread_id_to_delete):
+        # Get all child threads
+        child_threads = db.query(Thread).filter(
+            Thread.parent_thread_id == thread_id_to_delete
+        ).all()
+        
+        # Recursively delete each child branch
+        for child_thread in child_threads:
+            delete_branch_and_children(child_thread.id)
+        
+        # Delete all messages in this thread
+        db.query(Message).filter(Message.thread_id == thread_id_to_delete).delete()
+        
+        # Delete thread context
+        db.query(ThreadContext).filter(ThreadContext.thread_id == thread_id_to_delete).delete()
+        
+        # Delete the thread itself
+        thread_to_delete = db.query(Thread).filter(Thread.id == thread_id_to_delete).first()
+        if thread_to_delete:
+            db.delete(thread_to_delete)
+    
+    # Delete the thread and all its children
+    delete_branch_and_children(thread_id)
+    
+    db.commit()
+    
+    return {"message": "Thread and all child branches deleted successfully"}
+

@@ -2,6 +2,9 @@ from typing import List, Dict, Optional, Tuple
 from openai import AsyncOpenAI
 from .llm_provider import LLMProvider
 from ..config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(LLMProvider):
@@ -16,6 +19,7 @@ class OpenAIProvider(LLMProvider):
         messages: List[Dict[str, str]], 
         model: Optional[str] = None,
         previous_response_id: Optional[str] = None,
+        background: Optional[bool] = False,
         **kwargs
     ) -> Tuple[str, int, Dict]:
         """Send messages to OpenAI Responses API"""
@@ -42,6 +46,7 @@ class OpenAIProvider(LLMProvider):
         request_params = {
             "model": model_to_use,
             "input": input_message,
+            "background": background,
         }
         
         if instructions:
@@ -59,6 +64,20 @@ class OpenAIProvider(LLMProvider):
         # Call Responses API
         response = await self.client.responses.create(**request_params)
         
+        # Handle background requests: poll until completion
+        if background and response.status in ["in_progress", "queued"]:
+            import asyncio
+            import time
+            max_wait_time = 300  # 5 minutes max
+            check_interval = 1  # Poll every 1 second
+            start_time = time.time()
+            
+            while response.status in ["in_progress", "queued"]:
+                if time.time() - start_time > max_wait_time:
+                    raise TimeoutError("Background request did not complete within timeout")
+                await asyncio.sleep(check_interval)
+                response = await self.client.responses.retrieve(response.id)
+        
         # Extract content from response
         content = response.output_text if hasattr(response, 'output_text') else ""
         if not content and response.output:
@@ -70,14 +89,16 @@ class OpenAIProvider(LLMProvider):
                             content = content_item.get("text", "")
                             break
         
-        tokens_used = response.usage.total_tokens
+        # Safely get token usage (might not be available for incomplete responses)
+        tokens_used = response.usage.total_tokens if hasattr(response, 'usage') and response.usage else 0
         
         metadata = {
             "model": response.model,
             "status": response.status,
             "response_id": response.id,  # Store the response ID for branching
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
+            "input_tokens": response.usage.input_tokens if hasattr(response, 'usage') and hasattr(response.usage, 'input_tokens') else 0,
+            "output_tokens": response.usage.output_tokens if hasattr(response, 'usage') and hasattr(response.usage, 'output_tokens') else 0,
+            "background": background,
         }
         
         return content, tokens_used, metadata
