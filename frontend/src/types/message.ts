@@ -14,6 +14,7 @@ export interface Message {
   has_branches: boolean;
   branch_count: number;
   branches?: BranchInfo[];
+  isLoading?: boolean; // Flag to indicate if this is a loading/pending message
 }
 
 export interface BranchInfo {

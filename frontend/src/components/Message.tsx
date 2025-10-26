@@ -13,6 +13,7 @@ interface MessageProps {
 
 const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranch, onTextSelection, onDeleteBranch }) => {
   const isUser = message.role === 'user';
+  const isLoading = message.isLoading;
   const contentRef = useRef<HTMLDivElement>(null);
   
   const handleMouseUp = () => {
@@ -85,27 +86,35 @@ const Message: React.FC<MessageProps> = ({ message, onBranchClick, onCreateBranc
           className={`rounded-lg px-4 py-3 ${isUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-900'}`}
           onMouseUp={handleMouseUp}
         >
-          <p className="text-sm whitespace-pre-wrap">
-            {isUser || !message.branches || message.branches.length === 0 ? (
-              message.content
-            ) : (
-              <HighlightedText
-                content={message.content}
-                branches={message.branches.map(branch => ({
-                  threadId: branch.thread_id,
-                  title: branch.title || 'Branch',
-                  startOffset: branch.branch_text_start_offset || 0,
-                  endOffset: branch.branch_text_end_offset || 0,
-                  contextText: branch.branch_context_text || ''
-                }))}
-                onBranchClick={onBranchClick}
-              />
-            )}
-          </p>
+          {isLoading ? (
+            <div className="flex items-center space-x-1">
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce-delayed" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce-delayed" style={{ animationDelay: '200ms' }}></div>
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce-delayed" style={{ animationDelay: '400ms' }}></div>
+            </div>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap">
+              {isUser || !message.branches || message.branches.length === 0 ? (
+                message.content
+              ) : (
+                <HighlightedText
+                  content={message.content}
+                  branches={message.branches.map(branch => ({
+                    threadId: branch.thread_id,
+                    title: branch.title || 'Branch',
+                    startOffset: branch.branch_text_start_offset || 0,
+                    endOffset: branch.branch_text_end_offset || 0,
+                    contextText: branch.branch_context_text || ''
+                  }))}
+                  onBranchClick={onBranchClick}
+                />
+              )}
+            </p>
+          )}
         </div>
         
         {/* Footer with actions */}
-        {(!isUser && (message.has_branches || true)) && (
+        {(!isUser && (message.has_branches || true) && !isLoading) && (
           <div className={`flex items-center gap-2 mt-1 ${isUser ? 'flex-row-reverse' : ''}`}>
             {/* Actions */}
             {!isUser && (

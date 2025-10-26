@@ -16,12 +16,35 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentRootId, curren
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredThread, setHoveredThread] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const lastCurrentRootIdRef = useRef<string>('');
+  const rootThreadsRef = useRef<Thread[]>([]);
   const menuButtonRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const navigate = useNavigate();
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    rootThreadsRef.current = rootThreads;
+  }, [rootThreads]);
 
   useEffect(() => {
     loadRootThreads();
   }, []);
+
+  // Reload threads when currentThreadId changes to a thread that doesn't exist in the list
+  useEffect(() => {
+    if (!currentRootId || currentRootId === lastCurrentRootIdRef.current) {
+      return;
+    }
+    
+    lastCurrentRootIdRef.current = currentRootId;
+    
+    // Check if this thread exists in the current list using ref
+    const threadExists = rootThreadsRef.current.some(t => t.id === currentRootId);
+    if (!threadExists) {
+      // Reload threads list to get the new thread
+      loadRootThreads();
+    }
+  }, [currentRootId]);
 
 
 

@@ -33,6 +33,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
   // Text selection state
@@ -63,6 +64,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
 
   useEffect(() => {
     if (threadId) {
+      isInitialLoad.current = true;
       loadThread();
     }
     
@@ -96,12 +98,26 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     };
   }, [threadId, loadThread]);
 
+  // Track if this is the initial load
+  const isInitialLoad = useRef(true);
+  
   useEffect(() => {
-    scrollToBottom();
+    // On initial load, scroll to bottom instantly
+    // On subsequent updates, only scroll if user is near the bottom
+    if (isInitialLoad.current) {
+      scrollToBottom();
+      isInitialLoad.current = false;
+    } else if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+      if (isNearBottom) {
+        scrollToBottom();
+      }
+    }
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth: boolean = false) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -239,6 +255,51 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     setIsLoading(true);
     setError(null);
 
+    // Generate temporary IDs for optimistic messages
+    const userMessageId = `temp-user-${Date.now()}`;
+    const loadingMessageId = `temp-loading-${Date.now()}`;
+
+    // Optimistically add user message
+    const userMessage: MessageType = {
+      id: userMessageId,
+      thread_id: threadId!,
+      role: 'user',
+      content: messageContent,
+      sequence: messages.length + 1,
+      timestamp: new Date().toISOString(),
+      model: null,
+      provider: null,
+      tokens_used: null,
+      response_metadata: null,
+      has_branches: false,
+      branch_count: 0,
+      branches: [],
+    };
+
+    // Optimistically add loading assistant message
+    const loadingMessage: MessageType = {
+      id: loadingMessageId,
+      thread_id: threadId!,
+      role: 'assistant',
+      content: '',
+      sequence: messages.length + 2,
+      timestamp: new Date().toISOString(),
+      model: null,
+      provider: null,
+      tokens_used: null,
+      response_metadata: null,
+      has_branches: false,
+      branch_count: 0,
+      branches: [],
+      isLoading: true,
+    };
+
+    // Update UI immediately with optimistic messages
+    setMessages(prev => [...prev, userMessage, loadingMessage]);
+    
+    // Scroll to bottom to show new messages
+    setTimeout(() => scrollToBottom(true), 50);
+
     try {
       await messagesApi.sendMessage(threadId, { content: messageContent }, true);
       await loadThread();
@@ -246,6 +307,8 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       setError(err.message || 'Failed to send message');
       console.error('Error sending message:', err);
       setInputValue(messageContent);
+      // Only remove loading message on error, keep user message
+      setMessages(prev => prev.filter(m => m.id !== loadingMessageId));
     } finally {
       setIsLoading(false);
     }
@@ -259,7 +322,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-8 py-6 bg-white">
         <MessageList
           messages={messages}
           onBranchClick={handleBranchClick}

@@ -97,9 +97,13 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     setIsLoading(true);
     setError(null);
 
+    // Generate temporary IDs for optimistic messages
+    const userMessageId = `temp-user-${Date.now()}`;
+    const loadingMessageId = `temp-loading-${Date.now()}`;
+    
+    let currentThreadId = threadId;
+
     try {
-      let targetThreadId = threadId;
-      
       // If this is a pending branch, create the thread first
       if (!threadId && pendingBranch) {
         const newThread = await threadsApi.createThread({
@@ -109,34 +113,90 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
           branch_text_start_offset: pendingBranch.startOffset,
           branch_text_end_offset: pendingBranch.endOffset,
         });
-        targetThreadId = newThread.id;
+        currentThreadId = newThread.id;
         setThread(newThread);
-        setMessages([]); // Start fresh for new thread
-        
-        // Notify parent about the created thread
-        if (onThreadCreated) {
-          onThreadCreated(newThread.id, newThread.title || 'New Branch');
-        }
+        // Don't reset messages yet - we'll do that when adding optimistic messages
       }
       
-      if (!targetThreadId) {
+      if (!currentThreadId) {
         throw new Error('No thread ID available');
       }
+
+      // Determine if this is the first message in the thread
+      const isFirstMessage = messages.length === 0;
+      
+      // Calculate sequence numbers based on whether this is a new or existing thread
+      const sequenceStart = isFirstMessage ? 1 : messages.length + 1;
+
+      // Optimistically add user message
+      const userMessage: MessageType = {
+        id: userMessageId,
+        thread_id: currentThreadId,
+        role: 'user',
+        content: messageContent,
+        sequence: sequenceStart,
+        timestamp: new Date().toISOString(),
+        model: null,
+        provider: null,
+        tokens_used: null,
+        response_metadata: null,
+        has_branches: false,
+        branch_count: 0,
+        branches: [],
+      };
+
+      // Optimistically add loading assistant message
+      const loadingMessage: MessageType = {
+        id: loadingMessageId,
+        thread_id: currentThreadId,
+        role: 'assistant',
+        content: '',
+        sequence: sequenceStart + 1,
+        timestamp: new Date().toISOString(),
+        model: null,
+        provider: null,
+        tokens_used: null,
+        response_metadata: null,
+        has_branches: false,
+        branch_count: 0,
+        branches: [],
+        isLoading: true,
+      };
+
+      // Update UI immediately with optimistic messages
+      if (isFirstMessage) {
+        // For new threads, replace the empty array
+        setMessages([userMessage, loadingMessage]);
+      } else {
+        // For existing threads, append to current messages
+        setMessages(prev => [...prev, userMessage, loadingMessage]);
+      }
+      
+      // Scroll to bottom to show new messages
+      setTimeout(() => scrollToBottom(), 50);
       
       // Send message with background=true for parallel processing
-      await messagesApi.sendMessage(targetThreadId, { content: messageContent }, true);
+      await messagesApi.sendMessage(currentThreadId, { content: messageContent }, true);
       
       // Reload messages to get both user message and assistant response
-      if (targetThreadId !== threadId) {
+      if (currentThreadId !== threadId) {
         // First message in newly created thread, reload it
-        const data = await messagesApi.getMessages(targetThreadId);
+        const data = await messagesApi.getMessages(currentThreadId);
         setMessages(data.messages);
+        setThread(data.thread_info);
+        
+        // Notify parent about the created thread with updated title
+        if (onThreadCreated) {
+          onThreadCreated(currentThreadId, data.thread_info.title || 'New Branch');
+        }
       } else {
         await loadThread();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
       console.error('Error sending message:', err);
+      // Only remove loading message on error, keep user message
+      setMessages(prev => prev.filter(m => m.id !== loadingMessageId));
     } finally {
       setIsLoading(false);
     }

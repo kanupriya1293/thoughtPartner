@@ -44,3 +44,16 @@
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+@keyframes bounce-delayed {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce-delayed {
+  animation: bounce-delayed 1.4s ease-in-out infinite;
+}
