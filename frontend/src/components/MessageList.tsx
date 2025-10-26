@@ -12,10 +12,10 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, onBranchClick, onCreateBranch, onTextSelection, onDeleteBranch }) => {
   return (
-    <div className="message-list">
+    <div className="flex flex-col">
       {messages.length === 0 ? (
-        <div className="empty-state">
-          <p>Start a conversation by sending a message below.</p>
+        <div className="text-center text-gray-500 py-12">
+          <p className="text-sm">Start a conversation by sending a message below.</p>
         </div>
       ) : (
         messages.map((message) => (

@@ -1,22 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { threadsApi, messagesApi } from '../services/api';
-import RootThreadsList from './RootThreadsList';
+import ChatInputBox from './ChatInputBox';
 
 const HomeScreen: React.FC = () => {
-  const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputValue.trim() || isLoading) return;
+  const handleSendMessage = async (messageContent: string) => {
+    if (isLoading) return;
 
-    const messageContent = inputValue;
-    setInputValue('');
     setIsLoading(true);
     setError(null);
 
@@ -32,66 +26,73 @@ const HomeScreen: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to create thread and send message');
       console.error('Error creating thread and sending message:', err);
-      // Restore input on error
-      setInputValue(messageContent);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="home-screen-with-sidebar">
-      <div className="home-sidebar">
-        <RootThreadsList 
-          currentThreadId=""
-          currentRootId=""
-          currentThread={null}
-        />
-      </div>
-      
-      <div className="home-screen">
+    <div className="flex-1 flex items-start justify-center pt-12 bg-white h-full">
         {error && (
-          <div className="error-message">
+          <div className="bg-red-500 text-white px-8 py-3 rounded">
             {error}
           </div>
         )}
 
-        <div className="home-content">
-          <div className="home-input-container">
-            <h1 className="home-title">Start a conversation</h1>
-            <p className="home-subtitle">Type your message below to begin</p>
-            
-            <form className="home-input-form" onSubmit={handleSendMessage}>
-              <textarea
-                ref={inputRef}
-                className="home-input"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(e);
-                  }
-                }}
-                placeholder="Type your message... (Shift+Enter for new line)"
-                rows={6}
-                disabled={isLoading}
-                autoFocus
-              />
-              <button 
-                type="submit" 
-                className="btn-send-home"
-                disabled={isLoading || !inputValue.trim()}
-              >
-                {isLoading ? 'Starting conversation...' : 'Send'}
-              </button>
-            </form>
+        <div className="w-full max-w-4xl mx-auto">
+          {/* Grid Lines Container */}
+          <div className="relative w-full mx-auto">
+            {/* Vertical Grid Lines */}
+            <div className="absolute w-0 border-l border-black/5 left-0 top-0 bottom-0 pointer-events-none"></div>
+            <div className="absolute w-0 border-r border-black/5 right-0 top-0 bottom-0 pointer-events-none"></div>
+            <div className="relative pointer-events-auto">
+              <div className="w-full text-center">
+                {/* Nested container to match title text width */}
+                <div className="max-w-2xl mx-auto">
+                  {/* Headline and Subtitle wrapper with mb-12 spacing */}
+                  <div className="mb-12">
+                    {/* Title with wrapper */}
+                    <div className="flex justify-center my-8">
+                      <div className="relative inline-block p-2">
+                        <div className="absolute h-0 border-t border-black/5 top-0 left-0 right-0 pointer-events-none"></div>
+                        <div className="absolute h-0 border-b border-black/5 bottom-0 left-0 right-0 pointer-events-none"></div>
+                        <div className="relative pointer-events-auto">
+                          <h1 className="font-[450] tracking-tighter text-4xl sm:text-5xl text-center">
+                            Be Curious!
+                          </h1>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subtitle with wrapper */}
+                    <div className="flex justify-center my-0">
+                      <div className="relative inline-block p-2">
+                        <div className="absolute h-0 border-t border-black/5 top-0 left-0 right-0 pointer-events-none"></div>
+                        <div className="absolute h-0 border-b border-black/5 bottom-0 left-0 right-0 pointer-events-none"></div>
+                        <div className="relative pointer-events-auto">
+                          <p className="text-lg text-center text-neutral-700 font-light whitespace-nowrap">
+                            Pursue every thought. There are no wrong directions—only new discoveries.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Chat Input */}
+                  <div className="mb-8">
+                    <ChatInputBox 
+                      onSubmit={handleSendMessage}
+                      placeholder="Type your message here..."
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };
 
 export default HomeScreen;
-

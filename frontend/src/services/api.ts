@@ -36,6 +36,12 @@ export const threadsApi = {
     return response.data;
   },
 
+  // Update a thread
+  updateThread: async (threadId: string, data: Partial<Thread>): Promise<Thread> => {
+    const response = await api.patch<Thread>(`/threads/${threadId}`, data);
+    return response.data;
+  },
+
   // Delete a thread
   deleteThread: async (threadId: string): Promise<void> => {
     await api.delete(`/threads/${threadId}`);

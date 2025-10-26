@@ -23,6 +23,8 @@ A custom chatbot interface that enables learning through branching conversations
 - **React**: Component-based UI
 - **TypeScript**: Type-safe development
 - **Vite**: Fast build tool and dev server
+- **Tailwind CSS**: Utility-first CSS framework
+- **lucide-react**: Icon library
 
 ### Data Structure
 - **Threads**: Hierarchical structure with parent-child relationships

@@ -4,23 +4,24 @@ import { Thread } from '../types/thread';
 import { Message as MessageType } from '../types/message';
 import { messagesApi, threadsApi } from '../services/api';
 import MessageList from './MessageList';
-import RootThreadsList from './RootThreadsList';
 import SelectionMenu from './SelectionMenu';
-import BranchOverlay from './BranchOverlay';
+import ChatInputBox from './ChatInputBox';
 
-interface OverlayThread {
-  threadId?: string; // Optional if pending (not created yet)
-  title: string;
-  initialText?: string;
-  // Store branch creation context if thread not created yet
-  pendingBranch?: {
-    parentThreadId: string;
-    messageId: string;
-    contextText?: string;
-  };
+interface ChatViewProps {
+  onOpenOverlay: (
+    branchThreadId: string | undefined,
+    title: string,
+    initialText?: string,
+    pendingBranch?: {
+      parentThreadId: string;
+      messageId: string;
+      contextText?: string;
+    }
+  ) => void;
+  onCloseOverlay: () => void;
 }
 
-const ChatView: React.FC = () => {
+const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) => {
   const { threadId } = useParams<{ threadId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,10 +39,6 @@ const ChatView: React.FC = () => {
     selectedText: string;
     position: { x: number; y: number };
   } | null>(null);
-
-  // Overlay state
-  const [overlayStack, setOverlayStack] = useState<OverlayThread[]>([]);
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
 
   useEffect(() => {
     if (threadId) {
@@ -120,7 +117,7 @@ const ChatView: React.FC = () => {
     
     // Open overlay with pending branch context (thread created on first send)
     const quotedText = contextText ? `"${contextText}"\n\n` : undefined;
-    handleOpenOverlay(undefined, 'New Branch', quotedText, {
+    onOpenOverlay(undefined, 'New Branch', quotedText, {
       parentThreadId: threadId,
       messageId: messageId,
       contextText: contextText
@@ -134,7 +131,7 @@ const ChatView: React.FC = () => {
       .flatMap(msg => msg.branches || [])
       .find(b => b.thread_id === branchThreadId);
     
-    handleOpenOverlay(branchThreadId, branch?.title || 'Branch');
+    onOpenOverlay(branchThreadId, branch?.title || 'Branch');
   };
 
   const handleTextSelection = (messageId: string, selectedText: string, position: { x: number; y: number }) => {
@@ -169,99 +166,10 @@ const ChatView: React.FC = () => {
     setSelection(null);
     
     // Open overlay with pending branch context (thread created on first send)
-    handleOpenOverlay(undefined, 'New Branch', quotedText, {
+    onOpenOverlay(undefined, 'New Branch', quotedText, {
       parentThreadId: threadId,
       messageId: selection.messageId,
       contextText: selection.selectedText
-    });
-  };
-
-  const handleOpenOverlay = (threadId: string | undefined, title: string, initialText?: string, pendingBranch?: {
-    parentThreadId: string;
-    messageId: string;
-    contextText?: string;
-  }) => {
-    setOverlayStack([...overlayStack, { threadId, title, initialText, pendingBranch }]);
-    setIsOverlayOpen(true);
-  };
-
-  const handleCloseOverlay = async () => {
-    // No cleanup needed if threadId is undefined (pending branch)
-    // Only check if overlay had an actual thread created
-    let wasEmptyThreadDeleted = false;
-    if (overlayStack.length > 0) {
-      const topThread = overlayStack[overlayStack.length - 1];
-      if (topThread.threadId) {
-        // There was an actual thread, check if empty
-        try {
-          const data = await messagesApi.getMessages(topThread.threadId);
-          const hasUserMessages = data.messages.some(msg => msg.role === 'user');
-          if (!hasUserMessages) {
-            await threadsApi.deleteThread(topThread.threadId);
-            wasEmptyThreadDeleted = true;
-          }
-        } catch (err) {
-          console.error('Error checking/deleting empty overlay thread:', err);
-        }
-      }
-    }
-    
-    setOverlayStack([]);
-    setIsOverlayOpen(false);
-    
-    // Reload the main thread to refresh branch counts if we deleted an empty branch
-    if (wasEmptyThreadDeleted) {
-      await loadThread();
-    }
-  };
-
-  const handleBackInOverlay = async () => {
-    if (overlayStack.length > 1) {
-      // Check if the current overlay thread is empty before going back
-      let wasEmptyThreadDeleted = false;
-      const currentThread = overlayStack[overlayStack.length - 1];
-      if (currentThread.threadId) {
-        // There was an actual thread, check if empty
-        try {
-          const data = await messagesApi.getMessages(currentThread.threadId);
-          const hasUserMessages = data.messages.some(msg => msg.role === 'user');
-          if (!hasUserMessages) {
-            await threadsApi.deleteThread(currentThread.threadId);
-            wasEmptyThreadDeleted = true;
-          }
-        } catch (err) {
-          console.error('Error checking/deleting empty overlay thread on back:', err);
-        }
-      }
-      setOverlayStack(overlayStack.slice(0, -1));
-      
-      // Reload the main thread to refresh branch counts if we deleted an empty branch
-      if (wasEmptyThreadDeleted) {
-        await loadThread();
-      }
-    } else {
-      handleCloseOverlay();
-    }
-  };
-
-  const handleDeleteEmptyThread = async (threadId: string) => {
-    try {
-      await threadsApi.deleteThread(threadId);
-    } catch (err) {
-      console.error('Error deleting empty thread:', err);
-    }
-  };
-
-  const handleThreadCreated = (threadId: string, title: string) => {
-    // Update the overlay stack with the actual threadId
-    setOverlayStack(prevStack => {
-      const newStack = [...prevStack];
-      const lastItem = newStack[newStack.length - 1];
-      if (lastItem) {
-        lastItem.threadId = threadId;
-        lastItem.title = title;
-      }
-      return newStack;
     });
   };
 
@@ -296,9 +204,6 @@ const ChatView: React.FC = () => {
     }
   };
 
-  const currentOverlayThread = overlayStack[overlayStack.length - 1];
-  const canGoBackInOverlay = overlayStack.length > 1;
-
   if (!threadId) {
     return (
       <div className="chat-view">
@@ -307,98 +212,62 @@ const ChatView: React.FC = () => {
     );
   }
 
+  const handleMessageSubmit = async (messageContent: string) => {
+    if (!messageContent.trim() || isLoading || !threadId) return;
+    
+    setInputValue('');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await messagesApi.sendMessage(threadId, { content: messageContent }, true);
+      await loadThread();
+    } catch (err: any) {
+      setError(err.message || 'Failed to send message');
+      console.error('Error sending message:', err);
+      setInputValue(messageContent);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <>
-    <div className={`chat-view ${isOverlayOpen ? 'chat-view-dimmed' : ''}`}>
-      <div className="chat-sidebar">
-        <RootThreadsList 
-          currentThreadId={threadId}
-          currentRootId={thread?.root_id || threadId}
-          currentThread={thread}
+    <div className="relative flex flex-col bg-white h-full">
+      {error && (
+        <div className="bg-red-500 text-white px-8 py-3">
+          {error}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
+        <MessageList
+          messages={messages}
+          onBranchClick={handleBranchClick}
+          onCreateBranch={handleCreateBranch}
+          onTextSelection={handleTextSelection}
+          onDeleteBranch={handleDeleteBranch}
+        />
+        <div ref={messagesEndRef} />
+      </div>
+
+      {selection && (
+        <SelectionMenu
+          selectedText={selection.selectedText}
+          position={selection.position}
+          onAsk={handleAskHere}
+          onBranch={handleBranchFromSelection}
+          onClose={handleCloseSelection}
+        />
+      )}
+
+      <div className="px-8 py-4 bg-white">
+        <ChatInputBox 
+          onSubmit={handleMessageSubmit}
+          placeholder="Type your message here..."
+          disabled={isLoading}
         />
       </div>
-      
-      <div className="chat-main">
-        <div className="chat-header">
-          <h2>{thread?.title || 'Loading...'}</h2>
-          <button 
-            className="btn-header-delete"
-            onClick={handleDeleteCurrentThread}
-            title="Delete this thread"
-          >
-            🗑️
-          </button>
-        </div>
-
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
-
-        <div className="chat-messages">
-          <MessageList
-            messages={messages}
-            onBranchClick={handleBranchClick}
-            onCreateBranch={handleCreateBranch}
-            onTextSelection={handleTextSelection}
-            onDeleteBranch={handleDeleteBranch}
-          />
-          <div ref={messagesEndRef} />
-        </div>
-
-        {selection && (
-          <SelectionMenu
-            selectedText={selection.selectedText}
-            position={selection.position}
-            onAsk={handleAskHere}
-            onBranch={handleBranchFromSelection}
-            onClose={handleCloseSelection}
-          />
-        )}
-
-        <form className="chat-input-form" onSubmit={handleSendMessage}>
-          <textarea
-            ref={inputRef}
-            className="chat-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(e);
-              }
-            }}
-            placeholder="Type your message... (Shift+Enter for new line)"
-            rows={3}
-            disabled={isLoading}
-          />
-          <button 
-            type="submit" 
-            className="btn-send"
-            disabled={isLoading || !inputValue.trim()}
-          >
-            {isLoading ? 'Sending...' : 'Send'}
-          </button>
-        </form>
-      </div>
     </div>
-
-    {isOverlayOpen && currentOverlayThread && (
-      <BranchOverlay
-        threadId={currentOverlayThread.threadId}
-        parentThreadId={threadId}
-        onClose={handleCloseOverlay}
-        onBack={handleBackInOverlay}
-        canGoBack={canGoBackInOverlay}
-        initialText={currentOverlayThread.initialText}
-        onNavigateToBranch={handleOpenOverlay}
-        onDeleteEmptyThread={handleDeleteEmptyThread}
-        onThreadCreated={handleThreadCreated}
-        pendingBranch={currentOverlayThread.pendingBranch}
-      />
-    )}
-    </>
   );
 };
 

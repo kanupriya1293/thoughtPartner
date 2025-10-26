@@ -4,6 +4,7 @@ import { Message as MessageType } from '../types/message';
 import { messagesApi, threadsApi } from '../services/api';
 import MessageList from './MessageList';
 import SelectionMenu from './SelectionMenu';
+import ChatInputBox from './ChatInputBox';
 
 interface BranchOverlayProps {
   threadId?: string;
@@ -24,7 +25,6 @@ interface BranchOverlayProps {
 
 const BranchOverlay: React.FC<BranchOverlayProps> = ({
   threadId,
-  parentThreadId,
   onClose,
   onBack,
   canGoBack,
@@ -36,7 +36,6 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
 }) => {
   const [thread, setThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
-  const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,11 +52,6 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   useEffect(() => {
     if (threadId) {
       loadThread();
-    }
-    
-    // Set initial text if provided
-    if (initialText) {
-      setInputValue(initialText);
     }
     
     // Focus input when overlay opens
@@ -78,6 +72,7 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   };
 
   const loadThread = async () => {
+    if (!threadId) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -92,13 +87,9 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputValue.trim() || isLoading) return;
+  const handleMessageSubmit = async (messageContent: string) => {
+    if (!messageContent.trim() || isLoading) return;
 
-    const messageContent = inputValue;
-    setInputValue('');
     setIsLoading(true);
     setError(null);
 
@@ -140,8 +131,6 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
       console.error('Error sending message:', err);
-      // Restore input on error
-      setInputValue(messageContent);
     } finally {
       setIsLoading(false);
     }
@@ -191,16 +180,7 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
   const handleAskHere = () => {
     if (!selection) return;
     
-    // Add quoted text to input
-    const quotedText = `"${selection.selectedText}"\n\n`;
-    setInputValue(quotedText);
     setSelection(null);
-    
-    // Focus the input
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(quotedText.length, quotedText.length);
-    }, 0);
   };
 
   const handleBranchFromSelection = async () => {
@@ -229,59 +209,50 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
     }
   };
 
-  const handleBackdropClick = async (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
-      // Check if thread is empty before closing
+  const handleCloseClick = async () => {
+    // Check if thread is empty before closing
+    if (threadId) {
       const hasUserMessages = messages.some(msg => msg.role === 'user');
       if (!hasUserMessages && onDeleteEmptyThread) {
         await onDeleteEmptyThread(threadId);
       }
-      onClose();
-    }
-  };
-
-  const handleCloseClick = async () => {
-    // Check if thread is empty before closing
-    const hasUserMessages = messages.some(msg => msg.role === 'user');
-    if (!hasUserMessages && onDeleteEmptyThread) {
-      await onDeleteEmptyThread(threadId);
     }
     onClose();
   };
 
   return (
-    <div className="branch-overlay-backdrop" onClick={handleBackdropClick}>
-      <div className="branch-overlay" ref={overlayRef} onClick={(e) => e.stopPropagation()}>
-        <div className="branch-overlay-header">
-          <div className="branch-overlay-header-left">
-            {canGoBack && (
-              <button className="btn-back" onClick={onBack} title="Go back">
-                ← Back
-              </button>
-            )}
-            <h3 className="branch-overlay-title">{thread?.title || 'Branch Conversation'}</h3>
-          </div>
-          <button className="btn-close" onClick={handleCloseClick} title="Close overlay">
-            ×
+    <div className="absolute right-0 top-0 bottom-0 w-[40%] bg-white shadow-2xl flex flex-col h-full z-50" ref={overlayRef}>
+        {/* Header */}
+        <div className="px-6 py-4 bg-white flex items-center">
+          <button 
+            className="text-gray-500 hover:text-gray-700 transition-colors mr-4"
+            onClick={canGoBack ? onBack : handleCloseClick}
+            title={canGoBack ? "Go back" : "Close"}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
+          <h3 className="text-base font-medium text-gray-700">
+            {thread?.title || 'Branch Conversation'}
+          </h3>
         </div>
 
         {error && (
-          <div className="error-message">
+          <div className="bg-red-500 text-white px-6 py-3">
             {error}
           </div>
         )}
 
-        <div className="branch-overlay-content">
-          <div className="chat-messages">
-            <MessageList
-              messages={messages}
-              onBranchClick={handleBranchClick}
-              onCreateBranch={handleCreateBranch}
-              onTextSelection={handleTextSelection}
-            />
-            <div ref={messagesEndRef} />
-          </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-white">
+          <MessageList
+            messages={messages}
+            onBranchClick={handleBranchClick}
+            onCreateBranch={handleCreateBranch}
+            onTextSelection={handleTextSelection}
+          />
+          <div ref={messagesEndRef} />
         </div>
 
         {selection && (
@@ -294,33 +265,15 @@ const BranchOverlay: React.FC<BranchOverlayProps> = ({
           />
         )}
 
-        <div className="branch-overlay-footer">
-          <form className="chat-input-form" onSubmit={handleSendMessage}>
-            <textarea
-              ref={inputRef}
-              className="chat-input"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              placeholder="Type your message... (Shift+Enter for new line)"
-              rows={3}
-              disabled={isLoading}
-            />
-            <button 
-              type="submit" 
-              className="btn-send"
-              disabled={isLoading || !inputValue.trim()}
-            >
-              {isLoading ? 'Sending...' : 'Send'}
-            </button>
-          </form>
+        {/* Footer with ChatInputBox */}
+        <div className="px-6 py-4 bg-white">
+          <ChatInputBox
+            onSubmit={handleMessageSubmit}
+            placeholder="Type your message here..."
+            disabled={isLoading}
+            initialValue={pendingBranch?.contextText ? `"${pendingBranch.contextText}"\n\n` : ''}
+          />
         </div>
-      </div>
     </div>
   );
 };

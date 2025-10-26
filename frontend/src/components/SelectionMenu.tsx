@@ -1,4 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { MessageSquare, GitBranch } from 'lucide-react';
+import FloatingMenu from './FloatingMenu';
 
 interface SelectionMenuProps {
   selectedText: string;
@@ -9,35 +11,29 @@ interface SelectionMenuProps {
 }
 
 const SelectionMenu: React.FC<SelectionMenuProps> = ({ selectedText, position, onAsk, onBranch, onClose }) => {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  const menuItems = [
+    {
+      id: 'ask',
+      label: 'Ask here',
+      icon: <MessageSquare className="w-3 h-3" />,
+      onClick: onAsk,
+    },
+    {
+      id: 'branch',
+      label: 'Branch',
+      icon: <GitBranch className="w-3 h-3" />,
+      onClick: onBranch,
+    },
+  ];
 
   return (
-    <div 
-      ref={menuRef}
-      className="selection-menu"
-      style={{ 
-        left: `${position.x}px`, 
-        top: `${position.y}px` 
-      }}
-    >
-      <button className="selection-menu-btn" onClick={onAsk}>
-        Ask here
-      </button>
-      <button className="selection-menu-btn" onClick={onBranch}>
-        Branch
-      </button>
-    </div>
+    <FloatingMenu
+      items={menuItems}
+      isOpen={true}
+      onClose={onClose}
+      position={position}
+      anchor="left"
+    />
   );
 };
 
