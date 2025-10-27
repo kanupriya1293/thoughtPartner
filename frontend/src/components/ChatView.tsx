@@ -38,6 +38,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputBoxRef>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
   
   // Text selection state
   const [selection, setSelection] = useState<{
@@ -56,7 +57,22 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     try {
       const data = await messagesApi.getMessages(threadId);
       setThread(data.thread_info);
-      setMessages(data.messages);
+      
+      // Check if we need to keep current optimistic messages
+      const hasTemporaryMessages = messages.some(m => m.id.startsWith('temp-'));
+      
+      if (hasTemporaryMessages) {
+        // We have optimistic messages, check if assistant message is in DB
+        const assistantMessage = data.messages.find(msg => msg.role === 'assistant');
+        if (assistantMessage) {
+          // Assistant message arrived, replace with real messages
+          setMessages(data.messages);
+        }
+        // Otherwise keep the optimistic messages
+      } else {
+        // No optimistic messages, just load normally
+        setMessages(data.messages);
+      }
       
       // If this is a fork, fetch parent thread info for the "Forked from" indicator
       if (data.thread_info.parent_thread_id) {
@@ -86,10 +102,60 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
 
   useEffect(() => {
     if (threadId) {
-      isInitialLoad.current = true;
-      loadThread();
+      // Check for optimistic messages from navigation (HomeScreen)
+      const state = location.state as any;
+      if (state?.optimisticMessages) {
+        // Show optimistic messages immediately
+        setMessages(state.optimisticMessages);
+        isInitialLoad.current = true;
+        
+        // Clear the state to prevent it from showing again
+        window.history.replaceState({}, '');
+        
+        // Start polling for assistant message
+        pollingIntervalRef.current = setInterval(async () => {
+          try {
+            const data = await messagesApi.getMessages(threadId);
+            const assistantMessage = data.messages.find(msg => msg.role === 'assistant');
+            
+            if (assistantMessage && pollingIntervalRef.current) {
+              // Assistant message has arrived
+              setMessages(data.messages);
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+          } catch (err) {
+            console.error('Error polling for assistant message:', err);
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+          }
+        }, 1000);
+        
+        // Stop polling after 30 seconds
+        setTimeout(() => {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+        }, 30000);
+      } else {
+        // Normal load
+        isInitialLoad.current = true;
+        loadThread();
+      }
     }
     
+    // Cleanup polling interval on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [threadId, loadThread]);
+  
+  useEffect(() => {
     // Check if there's quoted text in navigation state
     if (location.state && (location.state as any).quotedText) {
       const quotedText = (location.state as any).quotedText;
@@ -104,7 +170,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
         inputRef.current?.setSelectionRange(quotedText.length, quotedText.length);
       }, 100);
     }
-  }, [threadId, location, loadThread]);
+  }, [threadId, location]);
 
   // Handle scrolling to a specific message or fork indicator (for fork navigation)
   useEffect(() => {
@@ -412,20 +478,46 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       // Send message with background processing
       await messagesApi.sendMessage(threadId, { content: messageContent }, true);
       
-      // Reload thread to get the actual messages (including assistant response)
-      await loadThread();
+      // Poll for assistant response to replace optimistic loading message
+      let pollCount = 0;
+      const maxPolls = 30; // Poll for up to 30 seconds
       
-      // Notify parent to refresh currentThread for sidebar
-      if (threadId) {
-        window.dispatchEvent(new CustomEvent('threadUpdated', { detail: { threadId } }));
-      }
+      const pollForResponse = setInterval(async () => {
+        pollCount++;
+        try {
+          const data = await messagesApi.getMessages(threadId);
+          const assistantMessage = data.messages.find(msg => msg.role === 'assistant');
+          
+          if (assistantMessage) {
+            // Assistant message has arrived, update messages
+            setMessages(data.messages);
+            clearInterval(pollForResponse);
+            
+            // Notify parent to refresh currentThread for sidebar
+            if (threadId) {
+              window.dispatchEvent(new CustomEvent('threadUpdated', { detail: { threadId } }));
+            }
+            setIsLoading(false);
+          } else if (pollCount >= maxPolls) {
+            // Timeout - just load what we have
+            clearInterval(pollForResponse);
+            await loadThread();
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error('Error polling for assistant response:', err);
+          clearInterval(pollForResponse);
+          await loadThread();
+          setIsLoading(false);
+        }
+      }, 1000); // Poll every second
+      
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
       console.error('Error sending message:', err);
       setInputValue(messageContent);
       // Only remove loading message on error, keep user message
       setMessages(prev => prev.filter(m => m.id !== loadingMessageId));
-    } finally {
       setIsLoading(false);
     }
   };

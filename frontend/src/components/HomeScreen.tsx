@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { threadsApi, messagesApi } from '../services/api';
 import ChatInputBox from './ChatInputBox';
+import { Message as MessageType } from '../types/message';
 
 const HomeScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -18,11 +19,54 @@ const HomeScreen: React.FC = () => {
       // Create a new thread first
       const newThread = await threadsApi.createThread({});
       
-      // Send the first message
+      // Create optimistic messages (same pattern as ChatView)
+      const userMessageId = `temp-user-${Date.now()}`;
+      const loadingMessageId = `temp-loading-${Date.now()}`;
+      
+      const userMessage: MessageType = {
+        id: userMessageId,
+        thread_id: newThread.id,
+        role: 'user',
+        content: messageContent,
+        sequence: 1,
+        timestamp: new Date().toISOString(),
+        model: null,
+        provider: null,
+        tokens_used: null,
+        response_metadata: null,
+        has_branches: false,
+        branch_count: 0,
+        branches: [],
+      };
+      
+      const loadingMessage: MessageType = {
+        id: loadingMessageId,
+        thread_id: newThread.id,
+        role: 'assistant',
+        content: '',
+        sequence: 2,
+        timestamp: new Date().toISOString(),
+        model: null,
+        provider: null,
+        tokens_used: null,
+        response_metadata: null,
+        has_branches: false,
+        branch_count: 0,
+        branches: [],
+        isLoading: true,
+      };
+      
+      // Navigate with optimistic messages
+      navigate(`/chat/${newThread.id}`, {
+        state: { optimisticMessages: [userMessage, loadingMessage] }
+      });
+      
+      // Send the first message (background processing)
       await messagesApi.sendMessage(newThread.id, { content: messageContent }, true);
       
-      // Navigate to the chat view
-      navigate(`/chat/${newThread.id}`);
+      // Notify parent to update sidebar with new thread
+      window.dispatchEvent(new CustomEvent('threadUpdated', { detail: { threadId: newThread.id } }));
+      window.dispatchEvent(new Event('threadsUpdated'));
     } catch (err: any) {
       setError(err.message || 'Failed to create thread and send message');
       console.error('Error creating thread and sending message:', err);
