@@ -97,11 +97,11 @@ const RootThreadsList: React.FC<RootThreadsListProps> = ({ currentRootId, curren
 
   const handleCreateNewThread = () => {
     // Simply navigate to home page where user can type a message to create a thread
-    navigate('/');
+    navigate('/simply-qurious');
   };
 
   const handleThreadClick = (threadId: string) => {
-    navigate(`/chat/${threadId}`);
+    navigate(`/simply-qurious/chat/${threadId}`);
   };
 
   const handleRename = async (threadId: string) => {

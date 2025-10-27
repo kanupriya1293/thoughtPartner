@@ -1,22 +1,30 @@
-import { useState, useRef, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import HomeScreen from './components/HomeScreen';
-import ChatView from './components/ChatView';
-import BranchOverlay from './components/BranchOverlay';
+import { useState, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import FloatingMenu, { FloatingMenuIcons } from './components/FloatingMenu';
-import RootThreadsList from './components/RootThreadsList';
+import SimplyQuriousPage from './components/SimplyQuriousPage';
+import LetterGeniePage from './components/LetterGeniePage';
 import './App.css';
 
 function AppHeader() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileButtonRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleProfileClick = () => {
     setIsProfileMenuOpen(!isProfileMenuOpen);
   };
 
   const handleLogoClick = () => {
-    window.location.href = '/';
+    navigate('/simply-qurious');
+  };
+
+  const handleNavClick = (path: string) => {
+    navigate(path);
+  };
+
+  const isActive = (path: string) => {
+    return location.pathname.startsWith(path);
   };
 
   const menuItems = [
@@ -51,7 +59,30 @@ function AppHeader() {
               <span className="text-white font-bold text-md">T</span>
             </div>
           </div>
-          <span className="text-lg font-semibold text-gray-900">Thought Partner</span>
+        </div>
+
+        {/* Center: Navigation */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8">
+          <button
+            onClick={() => handleNavClick('/simply-qurious')}
+            className={`text-sm font-normal transition-colors ${
+              isActive('/simply-qurious')
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Simply Qurious
+          </button>
+          <button
+            onClick={() => handleNavClick('/letter-genie')}
+            className={`text-sm font-normal transition-colors ${
+              isActive('/letter-genie')
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Letter Genie
+          </button>
         </div>
 
         {/* Right: User Profile */}
@@ -83,169 +114,24 @@ function AppHeader() {
   );
 }
 
-function App() {
+function AppLayoutContent() {
   return (
-    <Router>
-      <div className="h-screen flex flex-col">
-        <AppHeader />
-        <AppLayout />
-      </div>
-    </Router>
+    <div className="h-screen flex flex-col">
+      <AppHeader />
+      <Routes>
+        <Route path="/" element={<Navigate to="/simply-qurious" replace />} />
+        <Route path="/simply-qurious/*" element={<SimplyQuriousPage />} />
+        <Route path="/letter-genie" element={<LetterGeniePage />} />
+      </Routes>
+    </div>
   );
 }
 
-interface OverlayThread {
-  threadId?: string;
-  title: string;
-  initialText?: string;
-  pendingBranch?: {
-    parentThreadId: string;
-    messageId: string;
-    contextText?: string;
-    startOffset?: number;
-    endOffset?: number;
-  };
-}
-
-function AppLayout() {
-  const location = useLocation();
-  // Extract threadId from URL path
-  const threadId = location.pathname.startsWith('/chat/') 
-    ? location.pathname.split('/chat/')[1]?.split('/')[0]
-    : undefined;
-  const [overlayStack, setOverlayStack] = useState<OverlayThread[]>([]);
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [currentThread, setCurrentThread] = useState<any>(null);
-  
-  // Fetch current thread when threadId changes
-  useEffect(() => {
-    if (threadId) {
-      import('./services/api').then(({ threadsApi }) => {
-        threadsApi.getThread(threadId).then(setCurrentThread).catch(() => setCurrentThread(null));
-      });
-    } else {
-      setCurrentThread(null);
-    }
-  }, [threadId]);
-  
-  // Listen for thread updates to refresh sidebar
-  useEffect(() => {
-    const handleThreadUpdate = (event: any) => {
-      const updatedThreadId = event.detail.threadId;
-      if (updatedThreadId === threadId) {
-        import('./services/api').then(({ threadsApi }) => {
-          threadsApi.getThread(updatedThreadId).then(setCurrentThread).catch(() => setCurrentThread(null));
-        });
-      }
-    };
-    
-    window.addEventListener('threadUpdated', handleThreadUpdate);
-    
-    return () => {
-      window.removeEventListener('threadUpdated', handleThreadUpdate);
-    };
-  }, [threadId]);
-
-
-  const handleOpenOverlay = (
-    branchThreadId: string | undefined,
-    title: string,
-    initialText?: string,
-    pendingBranch?: {
-      parentThreadId: string;
-      messageId: string;
-      contextText?: string;
-      startOffset?: number;
-      endOffset?: number;
-    }
-  ) => {
-    setOverlayStack([...overlayStack, { threadId: branchThreadId, title, initialText, pendingBranch }]);
-    setIsOverlayOpen(true);
-  };
-
-  const handleCloseOverlay = () => {
-    setOverlayStack([]);
-    setIsOverlayOpen(false);
-  };
-
-  const handleBackInOverlay = async () => {
-    if (overlayStack.length > 1) {
-      setOverlayStack(overlayStack.slice(0, -1));
-    } else {
-      handleCloseOverlay();
-    }
-  };
-
-  const handleDeleteEmptyThread = async (_threadId: string) => {
-    // No-op at this level
-  };
-
-  const handleThreadCreated = (newThreadId: string, title: string) => {
-    setOverlayStack(prevStack => {
-      const newStack = [...prevStack];
-      if (newStack.length > 0) {
-        newStack[newStack.length - 1].threadId = newThreadId;
-        newStack[newStack.length - 1].title = title;
-      }
-      return newStack;
-    });
-    
-    // Trigger reload of parent thread to show new highlight
-    // This will be handled by ChatView's onBranchCreated callback
-    window.dispatchEvent(new CustomEvent('branchCreated'));
-  };
-
-  const currentOverlayThread = overlayStack[overlayStack.length - 1];
-  const canGoBackInOverlay = overlayStack.length > 1;
-
+function App() {
   return (
-    <div className="flex-1 overflow-hidden flex relative">
-      {/* Shared Sidebar */}
-      <div className="w-56 bg-gray-50 border-r border-gray-200 flex flex-col h-full">
-        <RootThreadsList 
-          currentThreadId={threadId || ''}
-          currentRootId={threadId || ''}
-          currentThread={currentThread}
-        />
-      </div>
-      
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden">
-        <Routes>
-          <Route path="/" element={<HomeScreen />} />
-          <Route path="/chat/:threadId" element={
-            <ChatView 
-              onOpenOverlay={handleOpenOverlay}
-              onCloseOverlay={handleCloseOverlay}
-            />
-          } />
-        </Routes>
-      </main>
-
-      {/* Backdrop */}
-      {isOverlayOpen && (
-        <div 
-          className="absolute inset-0 bg-black/40 z-40"
-          onClick={handleCloseOverlay}
-        />
-      )}
-
-      {/* Overlay */}
-      {isOverlayOpen && currentOverlayThread && (
-        <BranchOverlay
-          threadId={currentOverlayThread.threadId}
-          parentThreadId={threadId || ''}
-          onClose={handleCloseOverlay}
-          onBack={handleBackInOverlay}
-          canGoBack={canGoBackInOverlay}
-          initialText={currentOverlayThread.initialText}
-          onNavigateToBranch={handleOpenOverlay}
-          onDeleteEmptyThread={handleDeleteEmptyThread}
-          onThreadCreated={handleThreadCreated}
-          pendingBranch={currentOverlayThread.pendingBranch}
-        />
-      )}
-    </div>
+    <Router>
+      <AppLayoutContent />
+    </Router>
   );
 }
 

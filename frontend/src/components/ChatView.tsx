@@ -359,7 +359,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
 
     try {
       await threadsApi.deleteThread(threadId);
-      navigate('/');
+      navigate('/simply-qurious');
     } catch (error) {
       console.error('Error deleting thread:', error);
       alert('Failed to delete thread');
@@ -397,7 +397,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
       setParentMessages(messages); // Current messages become parent messages
       
       // Navigate to the new forked thread
-      navigate(`/chat/${newThread.id}`);
+      navigate(`/simply-qurious/chat/${newThread.id}`);
       // Reload threads list so new fork appears in sidebar
       window.dispatchEvent(new Event('threadsUpdated'));
     } catch (error) {
@@ -411,7 +411,7 @@ const ChatView: React.FC<ChatViewProps> = ({ onOpenOverlay, onCloseOverlay }) =>
     sessionStorage.setItem('scrollToMessage', messageId);
     
     // Navigate to the target thread
-    navigate(`/chat/${targetThreadId}`);
+    navigate(`/simply-qurious/chat/${targetThreadId}`);
   };
 
   if (!threadId) {

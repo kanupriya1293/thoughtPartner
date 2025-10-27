@@ -4,7 +4,7 @@ import { threadsApi, messagesApi } from '../services/api';
 import ChatInputBox from './ChatInputBox';
 import { Message as MessageType } from '../types/message';
 
-const HomeScreen: React.FC = () => {
+const SimplyQuriousHome: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -57,7 +57,7 @@ const HomeScreen: React.FC = () => {
       };
       
       // Navigate with optimistic messages
-      navigate(`/chat/${newThread.id}`, {
+      navigate(`/simply-qurious/chat/${newThread.id}`, {
         state: { optimisticMessages: [userMessage, loadingMessage] }
       });
       
@@ -139,4 +139,4 @@ const HomeScreen: React.FC = () => {
   );
 };
 
-export default HomeScreen;
+export default SimplyQuriousHome;
